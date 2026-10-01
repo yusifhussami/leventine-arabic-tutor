@@ -1,10 +1,20 @@
+import email.message
+import io
 import json
 import sqlite3
 import unittest
+import urllib.error
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from lexicon.judge import call_model, judge, parse_judgment, read_api_key, request_body
+from lexicon.judge import (
+    RateLimiter,
+    call_model,
+    judge,
+    parse_judgment,
+    read_api_key,
+    request_body,
+)
 from lexicon.load import connect, load_entries
 from lexicon.practice import practice_session
 
@@ -62,6 +72,51 @@ class JudgeTests(unittest.TestCase):
             path.write_text("# GEMINI_API_KEY=\n", encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 read_api_key(path)
+
+    def test_a_burst_waits_for_the_gap(self) -> None:
+        now = 0.0
+        slept: list[float] = []
+
+        def clock() -> float:
+            return now
+
+        def sleep(seconds: float) -> None:
+            nonlocal now
+            slept.append(seconds)
+            now += seconds
+
+        pace = RateLimiter(min_interval=4, clock=clock, sleep=sleep)
+        pace.wait()
+        pace.wait()
+        self.assertEqual(slept, [4])
+
+    def test_rate_limit_retries_then_succeeds(self) -> None:
+        calls = {"n": 0}
+        slept: list[float] = []
+
+        def opener(request, timeout):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                headers = email.message.Message()
+                headers["Retry-After"] = "2"
+                raise urllib.error.HTTPError(
+                    request.full_url,
+                    429,
+                    "rate",
+                    headers,
+                    io.BytesIO(b"quota"),
+                )
+            return _Response(_payload(True, True, "ok"))
+
+        uses, fits, comment = call_model(
+            "prompt",
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0, sleep=lambda _seconds: None),
+            sleep=slept.append,
+        )
+        self.assertEqual((uses, fits, comment), (True, True, "ok"))
+        self.assertEqual(slept, [2.0])
 
     def test_judge_stores_the_reply_for_the_attempt(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sqlite3
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -21,6 +22,11 @@ from lexicon.practice import PracticeCard, PracticeSession, practice_session, re
 from lexicon.prompt import build_prompt
 
 MODEL = "gemini-3.5-flash-lite"
+# Free-tier Flash-Lite is about 15 requests a minute. One sentence a human
+# types is slower than this; the gap only applies when calls bunch up.
+_MIN_INTERVAL_SECONDS = 4.0
+_MAX_ATTEMPTS = 4
+_RETRYABLE = {408, 429, 500, 502, 503, 504}
 ENDPOINT = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{MODEL}:generateContent"
@@ -97,24 +103,70 @@ def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
     return bool(data["uses_target"]), bool(data["fits_meaning"]), str(data["comment"])
 
 
-def call_model(prompt: str, api_key: str, opener=urllib.request.urlopen) -> tuple[bool, bool, str]:
-    """POST the prompt. The key is sent as a header, not in the URL."""
-    request = urllib.request.Request(
-        ENDPOINT,
-        data=json.dumps(request_body(prompt)).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-        },
-        method="POST",
-    )
-    try:
-        with opener(request, timeout=30) as response:
-            payload = json.loads(response.read().decode())
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")[:500]
-        raise RuntimeError(f"Gemini request failed ({exc.code}): {detail}") from exc
-    return parse_judgment(payload)
+class RateLimiter:
+    """Keep a gap between calls so a burst stays under the minute cap."""
+
+    def __init__(self, min_interval: float = _MIN_INTERVAL_SECONDS, clock=time.monotonic, sleep=time.sleep):
+        self.min_interval = min_interval
+        self._clock = clock
+        self._sleep = sleep
+        self._next = 0.0
+
+    def wait(self) -> None:
+        now = self._clock()
+        if now < self._next:
+            self._sleep(self._next - now)
+            now = self._clock()
+        self._next = now + self.min_interval
+
+
+_PACE = RateLimiter()
+
+
+def call_model(
+    prompt: str,
+    api_key: str,
+    opener=urllib.request.urlopen,
+    pace: RateLimiter | None = None,
+    sleep=time.sleep,
+) -> tuple[bool, bool, str]:
+    """POST the prompt. The key is sent as a header, not in the URL.
+
+    Calls are spaced, and a rate-limit or outage response is retried. A bad
+    request is not retried.
+    """
+    (pace or _PACE).wait()
+    delay = 1.0
+    for attempt in range(_MAX_ATTEMPTS):
+        request = urllib.request.Request(
+            ENDPOINT,
+            data=json.dumps(request_body(prompt)).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+            },
+            method="POST",
+        )
+        try:
+            with opener(request, timeout=30) as response:
+                payload = json.loads(response.read().decode())
+            return parse_judgment(payload)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _RETRYABLE or attempt == _MAX_ATTEMPTS - 1:
+                detail = exc.read().decode(errors="replace")[:500]
+                raise RuntimeError(f"Gemini request failed ({exc.code}): {detail}") from exc
+            sleep(_retry_delay(exc, delay))
+            delay = min(delay * 2, 8.0)
+
+
+def _retry_delay(exc: urllib.error.HTTPError, fallback: float) -> float:
+    header = exc.headers.get("Retry-After") if exc.headers is not None else None
+    if header:
+        try:
+            return float(header)
+        except ValueError:
+            return fallback
+    return fallback
 
 
 def judge(
