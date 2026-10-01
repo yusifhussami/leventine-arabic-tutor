@@ -54,6 +54,45 @@ class Judgment:
     created_at: str
 
 
+@dataclass(frozen=True)
+class CardMemory:
+    sentence: str
+    uses_target: bool | None
+    fits_meaning: bool | None
+    comment: str | None
+
+
+def card_history(conn: sqlite3.Connection, card: PracticeCard) -> list[CardMemory]:
+    """Earlier sentences for this card, oldest first, with the latest judgment."""
+    rows = conn.execute(
+        """
+        SELECT a.sentence, j.uses_target, j.fits_meaning, j.comment
+        FROM attempts a
+        LEFT JOIN judgments j ON j.id = (
+            SELECT id FROM judgments
+            WHERE attempt_id = a.id
+            ORDER BY id DESC
+            LIMIT 1
+        )
+        WHERE a.source_row = ? AND a.word = ? AND a.meaning = ?
+        ORDER BY a.id
+        """,
+        (card.source_row, card.word, card.meaning),
+    ).fetchall()
+    memories: list[CardMemory] = []
+    for row in rows:
+        judged = row["uses_target"] is not None
+        memories.append(
+            CardMemory(
+                row["sentence"],
+                bool(row["uses_target"]) if judged else None,
+                bool(row["fits_meaning"]) if judged else None,
+                row["comment"],
+            )
+        )
+    return memories
+
+
 def read_api_key(env_path: Path | str = ".env") -> str:
     """Return GEMINI_API_KEY from the environment, or from a local .env file."""
     from_env = os.environ.get("GEMINI_API_KEY", "").strip()

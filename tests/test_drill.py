@@ -45,6 +45,38 @@ class DrillTests(unittest.TestCase):
         self.assertIn("Grammar from this lesson:", output)
         self.assertIn("judged 1", output)
 
+    def test_a_prior_sentence_is_shown_before_the_next_attempt(self) -> None:
+        card = self.session.cards[0]
+        cursor = self.conn.execute(
+            """
+            INSERT INTO attempts (source_row, word, meaning, sentence, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (card.source_row, card.word, card.meaning, "ra7t 3al ijazeh", "t"),
+        )
+        self.conn.execute(
+            """
+            INSERT INTO judgments (
+                attempt_id, model, uses_target, fits_meaning, comment, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (cursor.lastrowid, "gemini-3.5-flash-lite", 1, 0, "too broad", "t"),
+        )
+        self.conn.commit()
+        output: list[str] = []
+        judged = run_drill(
+            self.conn,
+            self.session,
+            "test-key",
+            lambda: "q",
+            output.append,
+        )
+        self.assertEqual(judged, 0)
+        self.assertIn(
+            "  already tried: ra7t 3al ijazeh (uses the target; does not fit the meaning)",
+            output,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

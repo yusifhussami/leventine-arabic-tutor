@@ -10,7 +10,7 @@ import urllib.request
 from typing import Callable, Optional
 from pathlib import Path
 
-from lexicon.judge import judge, read_api_key
+from lexicon.judge import card_history, judge, read_api_key
 from lexicon.load import connect, load_entries
 from lexicon.practice import PracticeSession, practice_session
 
@@ -41,6 +41,13 @@ def run_drill(
     total = len(session.cards)
     for index, card in enumerate(session.cards, start=1):
         write(f"{index}/{total} {card.kind}: {card.word} — {card.meaning}")
+        for memory in card_history(conn, card):
+            if memory.uses_target is None:
+                write(f"  already tried: {memory.sentence} (not judged)")
+            else:
+                used = "uses the target" if memory.uses_target else "does not use the target"
+                fit = "fits the meaning" if memory.fits_meaning else "does not fit the meaning"
+                write(f"  already tried: {memory.sentence} ({used}; {fit})")
         line = read_line()
         if line is None:
             break
