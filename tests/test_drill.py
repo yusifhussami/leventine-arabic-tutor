@@ -1,8 +1,9 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from lexicon.drill import run_drill
+from lexicon.drill import read_sentence, run_drill
 from lexicon.load import connect, load_entries
 from lexicon.practice import practice_session
 
@@ -76,6 +77,10 @@ class DrillTests(unittest.TestCase):
             "  already tried: ra7t 3al ijazeh (uses the target; does not fit the meaning)",
             output,
         )
+
+    def test_closed_input_ends_the_session(self) -> None:
+        with patch("builtins.input", side_effect=EOFError):
+            self.assertIsNone(read_sentence())
 
 
 if __name__ == "__main__":

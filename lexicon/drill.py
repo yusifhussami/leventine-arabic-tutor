@@ -39,6 +39,7 @@ def run_drill(
 
     judged = 0
     total = len(session.cards)
+    write("Type a sentence. An empty line skips. q stops.")
     for index, card in enumerate(session.cards, start=1):
         write(f"{index}/{total} {card.kind}: {card.word} — {card.meaning}")
         for memory in card_history(conn, card):
@@ -66,6 +67,14 @@ def run_drill(
     return judged
 
 
+def read_sentence() -> Optional[str]:
+    """Read one line. A closed terminal ends the session instead of crashing."""
+    try:
+        return input()
+    except EOFError:
+        return None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Practice the newest lesson. An empty line skips a card. q stops."
@@ -80,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
         session = practice_session(conn)
         if not session.cards:
             raise SystemExit("the newest lesson has no words or phrases to practice")
-        run_drill(conn, session, read_api_key(), input, print)
+        run_drill(conn, session, read_api_key(), read_sentence, print)
     finally:
         conn.close()
 
