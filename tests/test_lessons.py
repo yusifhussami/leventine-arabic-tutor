@@ -77,6 +77,30 @@ class LessonTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             classify_entry(rows["ijazeh"])
 
+    def test_grammar_notes_are_not_the_words_they_describe(self) -> None:
+        path = Path(self.tmp.name) / "grammar.csv"
+        path.write_text(
+            "Word,Category,Date Added,Imperative,Meaning,Status\n"
+            "fe3el 2amr ,,18 June 2026 15:15,No,Imperative deed  /verb ,\n"
+            "jamme3 ,,12 July 2026 13:09,No,plural,\n"
+            "ma,,12 July 2026 13:06,No,negation (with exception),\n"
+            ",,12 July 2026 13:07,No,when negating people,\n"
+            "ekser,Verbs,18 June 2026 15:15,No,break (mild, imperative),\n"
+            "mustamer,Descriptors,18 June 2026 15:15,No,continuous,\n"
+            "2amr,Verbs,18 June 2026 15:15,No,Order,\n"
+            "fe3el,Goals and Ideas,18 June 2026 15:15,No,verb / deed,\n",
+            encoding="utf-8",
+        )
+        load_entries(self.conn, path)
+        rows = list(self.conn.execute("SELECT word, meaning FROM entries ORDER BY source_row"))
+        self.assertEqual(
+            [classify_entry(row) for row in rows[:4]],
+            ["grammar", "grammar", "grammar", "grammar"],
+        )
+        for row in rows[4:]:
+            with self.assertRaises(NotImplementedError):
+                classify_entry(row)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -80,9 +80,10 @@ _ARABIZI_DIGITS = frozenset("2356789")
 def classify_entry(row: sqlite3.Row) -> EntryKind:
     """Label one stored row for practice.
 
-    blank is both fields empty. reversed is an English word sitting in the
-    word column while the whole meaning is one Arabizi token. grammar, phrase,
-    and word are not decided yet, so any other filled row still raises.
+    blank is both fields empty. reversed is English in the word column and one
+    Arabizi token as the meaning. grammar is a lesson label, not a word whose
+    gloss happens to name a tense. phrase and word are not decided yet, so any
+    other filled row still raises.
     """
     word = (row["word"] or "").strip()
     meaning = (row["meaning"] or "").strip()
@@ -90,7 +91,9 @@ def classify_entry(row: sqlite3.Row) -> EntryKind:
         return "blank"
     if _is_reversed(word, meaning):
         return "reversed"
-    raise NotImplementedError("grammar, phrase, and word are not classified yet")
+    if _is_grammar(word, meaning):
+        return "grammar"
+    raise NotImplementedError("phrase and word are not classified yet")
 
 
 def _is_reversed(word: str, meaning: str) -> bool:
@@ -110,4 +113,34 @@ def _is_arabizi_token(text: str) -> bool:
     if not text or any(ch.isspace() for ch in text):
         return False
     return any(ch in _ARABIZI_DIGITS for ch in text)
+
+
+# These rows name a grammatical idea. A verb glossed "break (imperative)" is
+# not here: that is a word you say, with the form noted in parentheses.
+# "2amr" / "Order" and "fe3el" / "verb / deed" stay out. Each is also an
+# ordinary word, and a keyword rule cannot tell the two uses apart.
+_GRAMMAR_NOTES = {
+    ("fe3el 2amr", "imperative deed/verb"),
+    ("fe3el mustamer", "continuous word"),
+    ("jamme3", "plural"),
+    ("22mor", "order (imperative)"),
+    ("wa9if", "description/adjective"),
+    ("ma", "negation (with exception)"),
+}
+
+
+def _is_grammar(word: str, meaning: str) -> bool:
+    """True for a rule fragment, or for a headword on the note list.
+
+    A meaning with no headword has nothing to put in a sentence. "mustamer"
+    glossed only as "continuous" is not on the list: that row is the adjective.
+    """
+    if word == "" and meaning != "":
+        return True
+    return (_normalize_label(word), _normalize_label(meaning)) in _GRAMMAR_NOTES
+
+
+def _normalize_label(text: str) -> str:
+    text = " ".join(text.casefold().split())
+    return text.replace(" /", "/").replace("/ ", "/")
 
