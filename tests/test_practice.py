@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from lexicon.load import connect, load_entries
-from lexicon.practice import practice_session
+from lexicon.practice import attempts_for, practice_session, record_attempt
 
 CSV = """\
 Word,Category,Date Added,Imperative,Meaning,Status
@@ -45,6 +45,23 @@ class PracticeTests(unittest.TestCase):
             [(note.word, note.meaning) for note in session.notes],
             [("fe3el 2amr", "Imperative deed  /verb")],
         )
+
+    def test_attempt_is_stored_against_the_card_and_survives_reload(self) -> None:
+        card = practice_session(self.conn).cards[0]
+        saved = record_attempt(self.conn, card, "  ra7t 3al ijazeh  ")
+        self.assertEqual(saved.sentence, "ra7t 3al ijazeh")
+        load_entries(self.conn, self.csv_path)
+        stored = attempts_for(self.conn, card)
+        self.assertEqual(
+            [(item.word, item.meaning, item.sentence) for item in stored],
+            [("ijazeh", "holiday", "ra7t 3al ijazeh")],
+        )
+
+    def test_blank_sentence_is_rejected(self) -> None:
+        card = practice_session(self.conn).cards[0]
+        with self.assertRaises(ValueError):
+            record_attempt(self.conn, card, "   ")
+        self.assertEqual(attempts_for(self.conn, card), [])
 
 
 if __name__ == "__main__":

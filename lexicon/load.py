@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS duplicate_members (
 
 CREATE INDEX IF NOT EXISTS idx_duplicate_members_entry
     ON duplicate_members (entry_id);
+
+-- Attempts outlive a CSV reload. entries.id is assigned again on every load,
+-- so a foreign key to entries would delete the learner's sentences.
+CREATE TABLE IF NOT EXISTS attempts (
+    id INTEGER PRIMARY KEY,
+    source_row INTEGER NOT NULL,
+    word TEXT NOT NULL,
+    meaning TEXT NOT NULL,
+    sentence TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_attempts_card
+    ON attempts (source_row, word, meaning);
 """
 
 
@@ -102,6 +116,7 @@ def load_entries(conn: sqlite3.Connection, csv_path: Path | str) -> int:
         ]
 
     with conn:
+        # attempts stay. They snapshot the card, and entries.id changes on reload.
         conn.execute("DELETE FROM duplicate_members")
         conn.execute("DELETE FROM duplicate_groups")
         conn.execute("DELETE FROM entries")
