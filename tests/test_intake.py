@@ -4,7 +4,14 @@ from tempfile import TemporaryDirectory
 
 from lexicon.intake import parse_lesson_text
 from lexicon.load import connect, flag_duplicates, load_entries
-from lexicon.notebook import import_sheet, list_items, save_lesson, search_items, similar_items
+from lexicon.notebook import (
+    import_sheet,
+    list_items,
+    save_lesson,
+    search_items,
+    similar_items,
+    update_item,
+)
 
 SAMPLE = (
     "baza5 = fancy we7deh = loneliness "
@@ -62,6 +69,32 @@ class NotebookTests(unittest.TestCase):
         nearest = similar_items(self.conn, baza5)
         self.assertEqual(nearest[0]["spelling"], "7ayat al baza5 fiha we7deh")
         self.assertGreater(nearest[0]["score"], 0.5)
+
+    def test_editing_a_word_replaces_its_spelling_gloss_and_vector(self) -> None:
+        saved = save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+        item_id = saved["items"][0]["id"]
+
+        def embed(glosses: list[str]) -> list[list[float]]:
+            self.assertEqual(glosses, ["luxurious"])
+            return [[0.0, 1.0]]
+
+        updated = update_item(self.conn, item_id, "  hayet baza5  ", "luxurious", embed=embed)
+        self.assertEqual(updated["spelling"], "hayet baza5")
+        self.assertEqual(updated["gloss"], "luxurious")
+        self.assertEqual(updated["kind"], "phrase")
+        stored = next(item for item in list_items(self.conn) if item["id"] == item_id)
+        self.assertEqual((stored["spelling"], stored["gloss"]), ("hayet baza5", "luxurious"))
+        self.assertEqual(similar_items(self.conn, item_id)[0]["spelling"], "we7deh")
+
+        def unused(glosses: list[str]) -> list[list[float]]:
+            raise AssertionError(glosses)
+
+        same = update_item(self.conn, item_id, "baza5", "luxurious", embed=unused)
+        self.assertEqual(same["kind"], "word")
+        with self.assertRaises(ValueError):
+            update_item(self.conn, item_id, " ", "fancy", embed=unused)
+        with self.assertRaises(LookupError):
+            update_item(self.conn, 999, "bas", "but", embed=unused)
 
     def test_sheet_import_is_searchable_by_spelling_and_meaning(self) -> None:
         csv_path = Path(self.tmp.name) / "vocab.csv"

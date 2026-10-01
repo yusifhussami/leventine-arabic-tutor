@@ -12,7 +12,14 @@ from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.load import connect
-from lexicon.notebook import judge_saved_item, list_items, save_lesson, search_items, similar_items
+from lexicon.notebook import (
+    judge_saved_item,
+    list_items,
+    save_lesson,
+    search_items,
+    similar_items,
+    update_item,
+)
 
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 DB_PATH = Path("lexicon.db")
@@ -113,6 +120,32 @@ class NotebookHandler(BaseHTTPRequestHandler):
             self._json(502, {"error": str(exc)})
             return
         self._json(404, {"error": "not found"})
+
+    def do_PUT(self) -> None:
+        path = urlparse(self.path).path
+        prefix = "/api/items/"
+        if not path.startswith(prefix) or path.endswith("/similar"):
+            self._json(404, {"error": "not found"})
+            return
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+        except json.JSONDecodeError:
+            self._json(400, {"error": "send JSON"})
+            return
+        try:
+            item_id = int(path.removeprefix(prefix).strip("/"))
+        except ValueError:
+            self._json(404, {"error": "not found"})
+            return
+        conn = connect(DB_PATH)
+        try:
+            updated = update_item(conn, item_id, body.get("spelling") or "", body.get("gloss") or "")
+        except (ValueError, LookupError) as exc:
+            self._json(400, {"error": str(exc)})
+            return
+        finally:
+            conn.close()
+        self._json(200, updated)
 
     def log_message(self, fmt: str, *args) -> None:
         return

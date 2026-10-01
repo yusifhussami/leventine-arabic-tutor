@@ -244,6 +244,63 @@ def list_items(conn: sqlite3.Connection) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def update_item(
+    conn: sqlite3.Connection,
+    item_id: int,
+    spelling: str,
+    gloss: str,
+    embed=None,
+) -> dict:
+    """Replace one saved spelling and gloss. A new gloss gets a new vector."""
+    spelling = spelling.strip()
+    gloss = gloss.strip()
+    if not spelling or not gloss:
+        raise ValueError("need a word and a meaning")
+    current = conn.execute(
+        "SELECT id, gloss FROM lesson_items WHERE id = ?",
+        (item_id,),
+    ).fetchone()
+    if current is None:
+        raise LookupError(f"no item {item_id}")
+    kind = item_kind(spelling)
+    vector = None
+    if current["gloss"] != gloss:
+        if embed is None:
+            embed = embed_glosses
+        try:
+            vectors = embed([gloss])
+        except Exception:
+            vectors = None
+        if vectors and len(vectors) == 1 and vectors[0]:
+            vector = vectors[0]
+    with conn:
+        conn.execute(
+            "UPDATE lesson_items SET spelling = ?, gloss = ?, kind = ? WHERE id = ?",
+            (spelling, gloss, kind, item_id),
+        )
+        if vector:
+            conn.execute(
+                """
+                INSERT INTO lesson_embeddings (item_id, model, vector)
+                VALUES (?, ?, ?)
+                ON CONFLICT(item_id) DO UPDATE SET
+                    model = excluded.model,
+                    vector = excluded.vector
+                """,
+                (item_id, EMBED_MODEL, json.dumps(vector)),
+            )
+    row = conn.execute(
+        """
+        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE i.id = ?
+        """,
+        (item_id,),
+    ).fetchone()
+    return dict(row)
+
+
 def similar_items(conn: sqlite3.Connection, item_id: int, limit: int = 5) -> list[dict]:
     """Nearest other glosses by cosine similarity. Items without a vector are skipped."""
     rows = conn.execute(
