@@ -1,0 +1,190 @@
+"""Ask Gemini whether a sentence uses the practice card, and store the reply.
+
+The call uses gemini-3.5-flash-lite with minimal thinking and no search tools.
+The lesson gloss is the standard, so the model must not look the word up.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sqlite3
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+from lexicon.load import connect, load_entries
+from lexicon.practice import PracticeCard, PracticeSession, practice_session, record_attempt
+from lexicon.prompt import build_prompt
+
+MODEL = "gemini-3.5-flash-lite"
+ENDPOINT = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{MODEL}:generateContent"
+)
+
+_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "uses_target": {"type": "boolean"},
+        "fits_meaning": {"type": "boolean"},
+        "comment": {"type": "string"},
+    },
+    "required": ["uses_target", "fits_meaning", "comment"],
+}
+
+
+@dataclass(frozen=True)
+class Judgment:
+    id: int
+    attempt_id: int
+    model: str
+    uses_target: bool
+    fits_meaning: bool
+    comment: str
+    created_at: str
+
+
+def read_api_key(env_path: Path | str = ".env") -> str:
+    """Return GEMINI_API_KEY from the environment, or from a local .env file."""
+    from_env = os.environ.get("GEMINI_API_KEY", "").strip()
+    if from_env:
+        return from_env
+    path = Path(env_path)
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            text = line.strip()
+            if not text or text.startswith("#") or "=" not in text:
+                continue
+            name, value = text.split("=", 1)
+            if name.strip() == "GEMINI_API_KEY":
+                key = value.strip().strip('"').strip("'")
+                if key:
+                    return key
+    raise RuntimeError("Set GEMINI_API_KEY in .env")
+
+
+def request_body(prompt: str) -> dict:
+    """One user turn, a JSON judgment, and the cheapest thinking level."""
+    return {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0,
+            "responseMimeType": "application/json",
+            "responseSchema": _SCHEMA,
+            "thinkingConfig": {"thinkingLevel": "minimal"},
+        },
+    }
+
+
+def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
+    """Read uses_target, fits_meaning, and comment from a generateContent body."""
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        raise ValueError("model returned no candidates")
+    parts = candidates[0].get("content", {}).get("parts") or []
+    texts = [
+        part["text"]
+        for part in parts
+        if part.get("text") and not part.get("thought")
+    ]
+    if not texts:
+        raise ValueError("model returned no judgment text")
+    data = json.loads(texts[-1])
+    return bool(data["uses_target"]), bool(data["fits_meaning"]), str(data["comment"])
+
+
+def call_model(prompt: str, api_key: str, opener=urllib.request.urlopen) -> tuple[bool, bool, str]:
+    """POST the prompt. The key is sent as a header, not in the URL."""
+    request = urllib.request.Request(
+        ENDPOINT,
+        data=json.dumps(request_body(prompt)).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
+    )
+    try:
+        with opener(request, timeout=30) as response:
+            payload = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:500]
+        raise RuntimeError(f"Gemini request failed ({exc.code}): {detail}") from exc
+    return parse_judgment(payload)
+
+
+def judge(
+    conn: sqlite3.Connection,
+    session: PracticeSession,
+    card: PracticeCard,
+    sentence: str,
+    api_key: str,
+    opener=urllib.request.urlopen,
+) -> Judgment:
+    """Store the sentence, ask the model, and store the structured reply."""
+    attempt = record_attempt(conn, card, sentence)
+    uses_target, fits_meaning, comment = call_model(
+        build_prompt(session, card, sentence),
+        api_key,
+        opener,
+    )
+    created_at = datetime.now(timezone.utc).isoformat()
+    cursor = conn.execute(
+        """
+        INSERT INTO judgments (
+            attempt_id, model, uses_target, fits_meaning, comment, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            attempt.id,
+            MODEL,
+            int(uses_target),
+            int(fits_meaning),
+            comment,
+            created_at,
+        ),
+    )
+    conn.commit()
+    return Judgment(
+        int(cursor.lastrowid),
+        attempt.id,
+        MODEL,
+        uses_target,
+        fits_meaning,
+        comment,
+        created_at,
+    )
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Judge one sentence against a lesson card.")
+    parser.add_argument("csv_path", type=Path)
+    parser.add_argument("db_path", type=Path)
+    parser.add_argument("word")
+    parser.add_argument("sentence")
+    args = parser.parse_args(argv)
+
+    conn = connect(args.db_path)
+    try:
+        load_entries(conn, args.csv_path)
+        session = practice_session(conn)
+        matches = [card for card in session.cards if card.word == args.word]
+        if len(matches) != 1:
+            names = ", ".join(card.word for card in session.cards)
+            raise SystemExit(f"expected one card named {args.word!r}; cards: {names}")
+        result = judge(conn, session, matches[0], args.sentence, read_api_key())
+    finally:
+        conn.close()
+
+    used = "uses the target" if result.uses_target else "does not use the target"
+    fit = "fits the meaning" if result.fits_meaning else "does not fit the meaning"
+    print(f"{used}; {fit}")
+    print(result.comment)
+
+
+if __name__ == "__main__":
+    main()

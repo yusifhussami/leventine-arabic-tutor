@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS attempts (
 
 CREATE INDEX IF NOT EXISTS idx_attempts_card
     ON attempts (source_row, word, meaning);
+
+-- A judgment is the model reply for one stored sentence. attempt ids stay put
+-- across a CSV reload, so this foreign key is safe.
+CREATE TABLE IF NOT EXISTS judgments (
+    id INTEGER PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES attempts (id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    uses_target INTEGER NOT NULL CHECK (uses_target IN (0, 1)),
+    fits_meaning INTEGER NOT NULL CHECK (fits_meaning IN (0, 1)),
+    comment TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 
