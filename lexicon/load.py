@@ -118,6 +118,11 @@ CREATE TABLE IF NOT EXISTS lesson_judgments (
     comment TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 

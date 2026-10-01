@@ -33,7 +33,7 @@
       margin-bottom: 16px;
     }
     label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
-    textarea, input[type="date"], input[type="text"] {
+    textarea, input[type="date"], input[type="text"], input[type="url"], input[type="search"] {
       width: 100%;
       font: 16px/1.4 ui-sans-serif, system-ui, sans-serif;
       border: 1px solid var(--line);
@@ -72,6 +72,13 @@
 <body>
   <main>
     <h1>Lesson notebook</h1>
+    <p id="next-lesson" class="lead">Looking up your next Arabic lesson.</p>
+    <section id="calendar-setup">
+      <label for="calendar-url">Google Calendar iCal link</label>
+      <input id="calendar-url" type="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+      <div class="row"><button id="save-calendar" type="button">Save calendar</button></div>
+      <p id="calendar-error" class="error"></p>
+    </section>
     <p class="lead">Paste the words from today's lesson. Each Arabizi spelling stays with its English meaning, and you can practice every saved word.</p>
 
     <section>
@@ -112,6 +119,50 @@
     const learnedOn = document.querySelector("#learned-on");
     learnedOn.value = new Date().toISOString().slice(0, 10);
     let currentId = null;
+
+    function formatLesson(iso) {
+      const when = new Date(iso);
+      return when.toLocaleString(undefined, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+
+    async function loadNextLesson() {
+      const banner = document.querySelector("#next-lesson");
+      const setup = document.querySelector("#calendar-setup");
+      const response = await fetch("/api/next-lesson");
+      const payload = await response.json();
+      if (!response.ok) {
+        banner.textContent = payload.error || "Could not read the calendar.";
+        return;
+      }
+      setup.hidden = payload.connected;
+      if (!payload.connected) {
+        banner.textContent = "Connect Google Calendar to see your next Arabic lesson.";
+        return;
+      }
+      if (!payload.lesson) {
+        banner.textContent = "No upcoming event with Arabic in the title.";
+        return;
+      }
+      banner.textContent = "Next Arabic lesson: " + formatLesson(payload.lesson.start) + ".";
+    }
+
+    document.querySelector("#save-calendar").onclick = async () => {
+      const error = document.querySelector("#calendar-error");
+      error.textContent = "";
+      try {
+        await post("/api/calendar", { url: document.querySelector("#calendar-url").value });
+        document.querySelector("#calendar-url").value = "";
+        await loadNextLesson();
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    };
 
     async function post(url, body) {
       const response = await fetch(url, {
@@ -242,6 +293,7 @@
       }
     };
 
+    loadNextLesson();
     document.querySelector("#search").addEventListener("input", () => loadLibrary());
     loadLibrary();
   </script>

@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.load import connect
@@ -22,6 +23,21 @@ class NotebookHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self._bytes(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+            return
+        if path == "/api/next-lesson":
+            conn = connect(DB_PATH)
+            try:
+                if not calendar_connected(conn):
+                    self._json(200, {"connected": False, "lesson": None})
+                    return
+                try:
+                    lesson = next_lesson(conn)
+                except Exception as exc:
+                    self._json(502, {"error": str(exc)[:300]})
+                    return
+                self._json(200, {"connected": True, "lesson": lesson})
+            finally:
+                conn.close()
             return
         if path == "/api/items":
             conn = connect(DB_PATH)
@@ -51,6 +67,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
             self._json(400, {"error": "send JSON"})
             return
         try:
+            if path == "/api/calendar":
+                conn = connect(DB_PATH)
+                try:
+                    save_calendar_url(conn, body.get("url") or "")
+                finally:
+                    conn.close()
+                self._json(200, {"connected": True})
+                return
             if path == "/api/preview":
                 pairs = parse_lesson_text(body.get("text") or "")
                 self._json(
