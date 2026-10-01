@@ -132,5 +132,8 @@ def _allowed(url: str) -> bool:
 
 def _fetch(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": "leventine-notebook"})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return response.read().decode("utf-8", errors="replace")
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        raise RuntimeError("could not read the calendar") from exc

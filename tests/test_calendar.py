@@ -2,8 +2,10 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
+import urllib.error
 
-from lexicon.calendar_feed import next_lesson, save_calendar_url
+from lexicon.calendar_feed import _fetch, next_lesson, save_calendar_url
 from lexicon.load import connect
 
 FEED = """BEGIN:VCALENDAR
@@ -50,6 +52,18 @@ class CalendarTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             save_calendar_url(self.conn, "https://example.com/secret.ics")
         self.assertIsNone(next_lesson(self.conn))
+
+    def test_a_failed_fetch_does_not_repeat_the_link(self) -> None:
+        secret = "https://calendar.google.com/calendar/ical/private-token/basic.ics"
+
+        def boom(request, timeout):
+            raise urllib.error.URLError(request.full_url)
+
+        with patch("urllib.request.urlopen", boom):
+            with self.assertRaises(RuntimeError) as caught:
+                _fetch(secret)
+        self.assertEqual(str(caught.exception), "could not read the calendar")
+        self.assertNotIn("private-token", str(caught.exception))
 
 
 if __name__ == "__main__":

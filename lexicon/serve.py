@@ -32,8 +32,8 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     return
                 try:
                     lesson = next_lesson(conn)
-                except Exception as exc:
-                    self._json(502, {"error": str(exc)[:300]})
+                except Exception:
+                    self._json(502, {"error": "could not read the calendar"})
                     return
                 self._json(200, {"connected": True, "lesson": lesson})
             finally:

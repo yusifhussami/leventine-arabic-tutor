@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sqlite3
 from pathlib import Path
 
@@ -137,6 +138,9 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    path = Path(db_path)
+    if path.exists():
+        os.chmod(path, 0o600)
     return conn
 
 
