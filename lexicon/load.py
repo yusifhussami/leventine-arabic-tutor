@@ -76,6 +76,48 @@ CREATE TABLE IF NOT EXISTS judgments (
     comment TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+-- A dated batch of words the learner types after a lesson.
+CREATE TABLE IF NOT EXISTS lessons (
+    id INTEGER PRIMARY KEY,
+    learned_on TEXT NOT NULL,
+    raw_text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS lesson_items (
+    id INTEGER PRIMARY KEY,
+    lesson_id INTEGER NOT NULL REFERENCES lessons (id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    spelling TEXT NOT NULL,
+    gloss TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('word', 'phrase')),
+    UNIQUE (lesson_id, position)
+);
+
+-- The vector is the English gloss, so "fancy" can meet "rich".
+CREATE TABLE IF NOT EXISTS lesson_embeddings (
+    item_id INTEGER PRIMARY KEY REFERENCES lesson_items (id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    vector TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS lesson_attempts (
+    id INTEGER PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES lesson_items (id) ON DELETE CASCADE,
+    sentence TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS lesson_judgments (
+    id INTEGER PRIMARY KEY,
+    attempt_id INTEGER NOT NULL REFERENCES lesson_attempts (id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    uses_target INTEGER NOT NULL CHECK (uses_target IN (0, 1)),
+    fits_meaning INTEGER NOT NULL CHECK (fits_meaning IN (0, 1)),
+    comment TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 

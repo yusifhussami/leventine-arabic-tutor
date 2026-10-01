@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson notebook</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1917;
+      --muted: #57534e;
+      --paper: #f4efe6;
+      --card: #fffdf8;
+      --line: #e7e0d4;
+      --accent: #8f3d2c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 17px/1.45 Georgia, "Iowan Old Style", serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { font-size: 32px; font-weight: 500; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 500; margin: 0 0 12px; }
+    p.lead { color: var(--muted); margin: 0 0 24px; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    textarea, input[type="date"], input[type="text"] {
+      width: 100%;
+      font: 16px/1.4 ui-sans-serif, system-ui, sans-serif;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      color: var(--ink);
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    button {
+      font: 15px/1 ui-sans-serif, system-ui, sans-serif;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .error { color: var(--accent); min-height: 1.2em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .arabizi { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 18px; }
+    button.link {
+      background: none; color: var(--ink); border: 0; padding: 0;
+      font: inherit; text-align: left; cursor: pointer;
+    }
+    .kind { color: var(--muted); font-size: 13px; }
+    #practice { display: none; }
+    .similar { margin: 8px 0 0; padding: 0; list-style: none; }
+    .similar li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Lesson notebook</h1>
+    <p class="lead">Paste the words from today's lesson. Each Arabizi spelling stays with its English meaning, and you can practice every saved word.</p>
+
+    <section>
+      <h2>Add a lesson</h2>
+      <label for="learned-on">Lesson date</label>
+      <input id="learned-on" type="date">
+      <label for="paste" style="margin-top:12px">Words</label>
+      <textarea id="paste" placeholder="baza5 = fancy we7deh = loneliness 7ayat al baza5 fiha we7deh = rich life has loneliness"></textarea>
+      <div class="row">
+        <button id="preview" type="button">Preview</button>
+        <button id="save" class="ghost" type="button">Save lesson</button>
+      </div>
+      <p id="form-error" class="error"></p>
+      <table id="preview-table" hidden>
+        <thead><tr><th>Arabizi</th><th>English</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="practice">
+      <h2 id="practice-title"></h2>
+      <p id="practice-gloss"></p>
+      <ul id="similar" class="similar"></ul>
+      <label for="sentence">Your sentence</label>
+      <input id="sentence" type="text" placeholder="type Arabizi that uses this word">
+      <div class="row"><button id="judge" type="button">Check sentence</button></div>
+      <p id="judgment"></p>
+    </section>
+
+    <section>
+      <h2>All words</h2>
+      <div id="library"></div>
+    </section>
+  </main>
+  <script>
+    const learnedOn = document.querySelector("#learned-on");
+    learnedOn.value = new Date().toISOString().slice(0, 10);
+    let currentId = null;
+
+    async function post(url, body) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "request failed");
+      return payload;
+    }
+
+    function showPreview(items) {
+      const table = document.querySelector("#preview-table");
+      const body = table.querySelector("tbody");
+      body.replaceChildren();
+      for (const item of items) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td class="arabizi"></td><td></td><td class="kind"></td>`;
+        row.children[0].textContent = item.spelling;
+        row.children[1].textContent = item.gloss;
+        row.children[2].textContent = item.kind;
+        body.append(row);
+      }
+      table.hidden = items.length === 0;
+    }
+
+    document.querySelector("#preview").onclick = async () => {
+      const error = document.querySelector("#form-error");
+      error.textContent = "";
+      try {
+        showPreview(await post("/api/preview", { text: document.querySelector("#paste").value }));
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    };
+
+    document.querySelector("#save").onclick = async () => {
+      const error = document.querySelector("#form-error");
+      error.textContent = "";
+      try {
+        await post("/api/lessons", {
+          learned_on: learnedOn.value,
+          text: document.querySelector("#paste").value,
+        });
+        document.querySelector("#paste").value = "";
+        showPreview([]);
+        await loadLibrary();
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    };
+
+    async function loadLibrary() {
+      const items = await (await fetch("/api/items")).json();
+      const library = document.querySelector("#library");
+      library.replaceChildren();
+      const groups = new Map();
+      for (const item of items) {
+        if (!groups.has(item.learned_on)) groups.set(item.learned_on, []);
+        groups.get(item.learned_on).push(item);
+      }
+      if (groups.size === 0) {
+        library.textContent = "No lessons saved yet.";
+        return;
+      }
+      for (const [date, rows] of groups) {
+        const heading = document.createElement("h3");
+        heading.textContent = date;
+        library.append(heading);
+        const table = document.createElement("table");
+        const body = document.createElement("tbody");
+        for (const item of rows) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          const button = document.createElement("button");
+          button.className = "link arabizi";
+          button.textContent = item.spelling;
+          button.onclick = () => openPractice(item);
+          cell.append(button);
+          const gloss = document.createElement("td");
+          gloss.textContent = item.gloss;
+          const kind = document.createElement("td");
+          kind.className = "kind";
+          kind.textContent = item.kind;
+          row.append(cell, gloss, kind);
+          body.append(row);
+        }
+        table.append(body);
+        library.append(table);
+      }
+    }
+
+    async function openPractice(item) {
+      currentId = item.id;
+      const panel = document.querySelector("#practice");
+      panel.style.display = "block";
+      document.querySelector("#practice-title").textContent = item.spelling;
+      document.querySelector("#practice-gloss").textContent = item.gloss;
+      document.querySelector("#sentence").value = "";
+      document.querySelector("#judgment").textContent = "";
+      const similar = document.querySelector("#similar");
+      similar.replaceChildren();
+      const matches = await (await fetch(`/api/items/${item.id}/similar`)).json();
+      for (const match of matches) {
+        const li = document.createElement("li");
+        li.textContent = match.spelling + " - " + match.gloss;
+        similar.append(li);
+      }
+      panel.scrollIntoView({ behavior: "smooth" });
+    }
+
+    document.querySelector("#judge").onclick = async () => {
+      const judgment = document.querySelector("#judgment");
+      judgment.textContent = "";
+      try {
+        const result = await post("/api/practice", {
+          item_id: currentId,
+          sentence: document.querySelector("#sentence").value,
+        });
+        const used = result.uses_target ? "uses the target" : "does not use the target";
+        const fit = result.fits_meaning ? "fits the meaning" : "does not fit the meaning";
+        judgment.textContent = `${used}; ${fit}. ${result.comment}`;
+      } catch (err) {
+        judgment.textContent = err.message;
+      }
+    };
+
+    loadLibrary();
+  </script>
+</body>
+</html>
