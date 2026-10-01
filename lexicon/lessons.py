@@ -72,19 +72,42 @@ def latest_lesson(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 EntryKind = Literal["blank", "reversed", "grammar", "phrase", "word"]
 
+# Chat-alphabet digits. A 2 or a 7 inside an English example is not, by itself,
+# proof that the columns were swapped.
+_ARABIZI_DIGITS = frozenset("2356789")
+
 
 def classify_entry(row: sqlite3.Row) -> EntryKind:
     """Label one stored row for practice.
 
-    blank is both the word and the meaning being empty. reversed, grammar,
-    phrase, and word depend on the text and are not decided yet, so a filled
-    row raises until those rules exist.
+    blank is both fields empty. reversed is an English word sitting in the
+    word column while the whole meaning is one Arabizi token. grammar, phrase,
+    and word are not decided yet, so any other filled row still raises.
     """
     word = (row["word"] or "").strip()
     meaning = (row["meaning"] or "").strip()
     if word == "" and meaning == "":
         return "blank"
-    raise NotImplementedError(
-        "reversed, grammar, phrase, and word are not classified yet"
-    )
+    if _is_reversed(word, meaning):
+        return "reversed"
+    raise NotImplementedError("grammar, phrase, and word are not classified yet")
+
+
+def _is_reversed(word: str, meaning: str) -> bool:
+    """True when the English gloss and the Arabizi spelling traded columns.
+
+    The meaning has to be one token. An English gloss that quotes Arabizi
+    later, as in fakker's "ma 2deret afakker", still belongs to a real word.
+    """
+    return _is_plain_english(word) and _is_arabizi_token(meaning)
+
+
+def _is_plain_english(text: str) -> bool:
+    return bool(text) and all(ch.isascii() and (ch.isalpha() or ch.isspace()) for ch in text)
+
+
+def _is_arabizi_token(text: str) -> bool:
+    if not text or any(ch.isspace() for ch in text):
+        return False
+    return any(ch in _ARABIZI_DIGITS for ch in text)
 

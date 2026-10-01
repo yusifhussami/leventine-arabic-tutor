@@ -53,6 +53,30 @@ class LessonTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             classify_entry(filled)
 
+    def test_swapped_columns_are_reversed(self) -> None:
+        path = Path(self.tmp.name) / "swapped.csv"
+        path.write_text(
+            "Word,Category,Date Added,Imperative,Meaning,Status\n"
+            "to expect,,13 September 2026 12:52,No,etwa8a3,\n"
+            "joking,,13 September 2026 12:58,No,maze7,\n"
+            "England,,12 July 2026 13:03,No,Bri6ania,\n"
+            'fakker,Verbs,18 June 2026 15:15,No,"to think; e.g. ma 2deret afakker",\n'
+            "ijazeh,,13 September 2026 12:39,No,holiday,\n",
+            encoding="utf-8",
+        )
+        load_entries(self.conn, path)
+        rows = {
+            row["word"]: row
+            for row in self.conn.execute("SELECT word, meaning FROM entries")
+        }
+        self.assertEqual(classify_entry(rows["to expect"]), "reversed")
+        self.assertEqual(classify_entry(rows["joking"]), "reversed")
+        self.assertEqual(classify_entry(rows["England"]), "reversed")
+        with self.assertRaises(NotImplementedError):
+            classify_entry(rows["fakker"])
+        with self.assertRaises(NotImplementedError):
+            classify_entry(rows["ijazeh"])
+
 
 if __name__ == "__main__":
     unittest.main()
