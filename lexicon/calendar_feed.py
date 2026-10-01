@@ -1,7 +1,7 @@
 """Read the next Arabic lesson from a Google Calendar iCal feed.
 
 The private calendar link stays in settings. Callers only receive the next
-event whose title contains "arabic".
+event whose title contains "preply" or "arabic".
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def next_lesson(
     upcoming = [
         event
         for event in parse_events(text)
-        if "arabic" in event["summary"].casefold() and event["start"] >= moment
+        if _is_lesson(event["summary"]) and event["start"] >= moment
     ]
     if not upcoming:
         return None
@@ -59,6 +59,11 @@ def next_lesson(
         "summary": chosen["summary"],
         "start": chosen["start"].isoformat(),
     }
+
+
+def _is_lesson(summary: str) -> bool:
+    title = summary.casefold()
+    return "preply" in title or "arabic" in title
 
 
 def parse_events(text: str) -> list[dict]:

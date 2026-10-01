@@ -15,7 +15,7 @@ SUMMARY:Arabic practice
 END:VEVENT
 BEGIN:VEVENT
 DTSTART:20261006T150000Z
-SUMMARY:Arabic with the tutor
+SUMMARY:Preply Arabic
 END:VEVENT
 BEGIN:VEVENT
 DTSTART:20261008T090000Z
@@ -45,7 +45,7 @@ class CalendarTests(unittest.TestCase):
             now=datetime(2026, 10, 1, tzinfo=timezone.utc),
             fetch=lambda _url: FEED,
         )
-        self.assertEqual(found["summary"], "Arabic with the tutor")
+        self.assertEqual(found["summary"], "Preply Arabic")
         self.assertTrue(found["start"].startswith("2026-10-06T15:00:00"))
 
     def test_other_hosts_are_rejected(self) -> None:

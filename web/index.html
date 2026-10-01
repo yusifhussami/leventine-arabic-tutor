@@ -146,10 +146,10 @@
         return;
       }
       if (!payload.lesson) {
-        banner.textContent = "No upcoming event with Arabic in the title.";
+        banner.textContent = "No upcoming Preply lesson on that calendar.";
         return;
       }
-      banner.textContent = "Next Arabic lesson: " + formatLesson(payload.lesson.start) + ".";
+      banner.textContent = "Next lesson: " + formatLesson(payload.lesson.start) + " (" + payload.lesson.summary + ").";
     }
 
     document.querySelector("#save-calendar").onclick = async () => {
