@@ -3,8 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from lexicon.intake import parse_lesson_text
-from lexicon.load import connect
-from lexicon.notebook import list_items, save_lesson, similar_items
+from lexicon.load import connect, flag_duplicates, load_entries
+from lexicon.notebook import import_sheet, list_items, save_lesson, search_items, similar_items
 
 SAMPLE = (
     "baza5 = fancy we7deh = loneliness "
@@ -62,6 +62,35 @@ class NotebookTests(unittest.TestCase):
         nearest = similar_items(self.conn, baza5)
         self.assertEqual(nearest[0]["spelling"], "7ayat al baza5 fiha we7deh")
         self.assertGreater(nearest[0]["score"], 0.5)
+
+    def test_sheet_import_is_searchable_by_spelling_and_meaning(self) -> None:
+        csv_path = Path(self.tmp.name) / "vocab.csv"
+        csv_path.write_text(
+            "Word,Category,Date Added,Imperative,Meaning,Status\n"
+            "bas,Core,18 June 2026 15:15,No,but,\n"
+            "bas,Core,2 July 2026 15:04,No,But,\n"
+            "jamme3,,12 July 2026 13:09,No,plural,\n"
+            "joking,,13 September 2026 12:58,No,maze7,\n"
+            "we7deh,,13 September 2026 13:00,No,loneliness,\n",
+            encoding="utf-8",
+        )
+        load_entries(self.conn, csv_path)
+        flag_duplicates(self.conn)
+
+        def embed(texts: list[str]) -> list[list[float]]:
+            table = {"but": [1.0, 0.0], "joking": [1.0, 0.0], "loneliness": [0.2, 0.9], "lonely": [0.1, 1.0]}
+            return [table.get(text, [0.0, 0.0]) for text in texts]
+
+        first = import_sheet(self.conn, embed=embed)
+        second = import_sheet(self.conn, embed=embed)
+        self.assertEqual(second, {"days": 0, "items": 0})
+        self.assertEqual(first["items"], 3)
+        spellings = {item["spelling"] for item in list_items(self.conn) if item["learned_on"] != "2026-10-01"}
+        self.assertEqual(spellings, {"bas", "maze7", "we7deh"})
+        self.assertEqual(search_items(self.conn, "we7", embed=embed)[0]["spelling"], "we7deh")
+        lonely = search_items(self.conn, "lonely", embed=embed)
+        self.assertEqual(lonely[0]["spelling"], "we7deh")
+        self.assertEqual(lonely[0]["match"], "meaning")
 
 
 if __name__ == "__main__":

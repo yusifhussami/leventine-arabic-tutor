@@ -6,12 +6,12 @@ import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.load import connect
-from lexicon.notebook import judge_saved_item, list_items, save_lesson, similar_items
+from lexicon.notebook import judge_saved_item, list_items, save_lesson, search_items, similar_items
 
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 DB_PATH = Path("lexicon.db")
@@ -26,7 +26,8 @@ class NotebookHandler(BaseHTTPRequestHandler):
         if path == "/api/items":
             conn = connect(DB_PATH)
             try:
-                self._json(200, list_items(conn))
+                query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+                self._json(200, search_items(conn, query) if query.strip() else list_items(conn))
             finally:
                 conn.close()
             return

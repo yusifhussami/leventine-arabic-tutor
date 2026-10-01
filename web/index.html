@@ -103,6 +103,8 @@
 
     <section>
       <h2>All words</h2>
+      <label for="search">Search</label>
+      <input id="search" type="search" placeholder="English meaning or Arabizi spelling">
       <div id="library"></div>
     </section>
   </main>
@@ -164,7 +166,9 @@
     };
 
     async function loadLibrary() {
-      const items = await (await fetch("/api/items")).json();
+      const query = document.querySelector("#search").value.trim();
+      const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
+      const items = await (await fetch(url)).json();
       const library = document.querySelector("#library");
       library.replaceChildren();
       const groups = new Map();
@@ -238,6 +242,7 @@
       }
     };
 
+    document.querySelector("#search").addEventListener("input", () => loadLibrary());
     loadLibrary();
   </script>
 </body>
