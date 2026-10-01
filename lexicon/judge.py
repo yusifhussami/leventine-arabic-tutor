@@ -1,7 +1,7 @@
-"""Ask Gemini whether a sentence uses the practice card, and store the reply.
+"""Ask the tutor model whether a sentence uses the practice card, and store the reply.
 
-The call uses gemini-3.5-flash-lite with minimal thinking and no search tools.
-The lesson gloss is the standard, so the model must not look the word up.
+The call goes through OpenRouter to google/gemini-3.5-flash-lite. The lesson
+gloss is the standard, so the model must not look the word up.
 """
 
 from __future__ import annotations
@@ -21,16 +21,13 @@ from lexicon.load import connect, load_entries
 from lexicon.practice import PracticeCard, PracticeSession, practice_session, record_attempt
 from lexicon.prompt import build_prompt
 
-MODEL = "gemini-3.5-flash-lite"
-# Free-tier Flash-Lite is about 15 requests a minute. One sentence a human
-# types is slower than this; the gap only applies when calls bunch up.
+MODEL = "google/gemini-3.5-flash-lite"
+# One sentence a human types is slower than this. The gap only applies when calls bunch up.
 _MIN_INTERVAL_SECONDS = 4.0
 _MAX_ATTEMPTS = 4
 _RETRYABLE = {408, 429, 500, 502, 503, 504}
-ENDPOINT = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{MODEL}:generateContent"
-)
+ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+_KEY_NAMES = ("OPENROUTER_API_KEY", "GEMINI_API_KEY")
 
 _SCHEMA = {
     "type": "object",
@@ -94,51 +91,56 @@ def card_history(conn: sqlite3.Connection, card: PracticeCard) -> list[CardMemor
 
 
 def read_api_key(env_path: Path | str = ".env") -> str:
-    """Return GEMINI_API_KEY from the environment, or from a local .env file."""
-    from_env = os.environ.get("GEMINI_API_KEY", "").strip()
-    if from_env:
-        return from_env
+    """Return the OpenRouter key from the environment, or from a local .env file.
+
+    GEMINI_API_KEY is accepted because that is the name already in .env.
+    """
+    for name in _KEY_NAMES:
+        from_env = os.environ.get(name, "").strip()
+        if from_env:
+            return from_env
     path = Path(env_path)
+    found: dict[str, str] = {}
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
             text = line.strip()
             if not text or text.startswith("#") or "=" not in text:
                 continue
             name, value = text.split("=", 1)
-            if name.strip() == "GEMINI_API_KEY":
-                key = value.strip().strip('"').strip("'")
-                if key:
-                    return key
-    raise RuntimeError("Set GEMINI_API_KEY in .env")
+            key = value.strip().strip('"').strip("'")
+            if key:
+                found[name.strip()] = key
+    for name in _KEY_NAMES:
+        if name in found:
+            return found[name]
+    raise RuntimeError("Set OPENROUTER_API_KEY in .env")
 
 
 def request_body(prompt: str) -> dict:
-    """One user turn, a JSON judgment, and the cheapest thinking level."""
+    """One user turn, a JSON judgment, and the cheapest reasoning level."""
     return {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0,
-            "responseMimeType": "application/json",
-            "responseSchema": _SCHEMA,
-            "thinkingConfig": {"thinkingLevel": "minimal"},
+        "model": MODEL,
+        "temperature": 0,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "judgment", "strict": True, "schema": _SCHEMA},
         },
+        "reasoning": {"effort": "minimal"},
     }
 
 
 def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
-    """Read uses_target, fits_meaning, and comment from a generateContent body."""
-    candidates = payload.get("candidates") or []
-    if not candidates:
-        raise ValueError("model returned no candidates")
-    parts = candidates[0].get("content", {}).get("parts") or []
-    texts = [
-        part["text"]
-        for part in parts
-        if part.get("text") and not part.get("thought")
-    ]
-    if not texts:
-        raise ValueError("model returned no judgment text")
-    data = json.loads(texts[-1])
+    """Read uses_target, fits_meaning, and comment from a chat completion."""
+    choices = payload.get("choices") or []
+    if not choices:
+        raise ValueError("model returned no choices")
+    content = choices[0].get("message", {}).get("content") or ""
+    if isinstance(content, list):
+        content = "".join(
+            part.get("text", "") for part in content if isinstance(part, dict)
+        )
+    data = json.loads(content)
     return bool(data["uses_target"]), bool(data["fits_meaning"]), str(data["comment"])
 
 
@@ -182,7 +184,7 @@ def call_model(
             data=json.dumps(request_body(prompt)).encode(),
             headers={
                 "Content-Type": "application/json",
-                "x-goog-api-key": api_key,
+                "Authorization": f"Bearer {api_key}",
             },
             method="POST",
         )
@@ -193,7 +195,7 @@ def call_model(
         except urllib.error.HTTPError as exc:
             if exc.code not in _RETRYABLE or attempt == _MAX_ATTEMPTS - 1:
                 detail = exc.read().decode(errors="replace")[:500]
-                raise RuntimeError(f"Gemini request failed ({exc.code}): {detail}") from exc
+                raise RuntimeError(f"OpenRouter request failed ({exc.code}): {detail}") from exc
             sleep(_retry_delay(exc, delay))
             delay = min(delay * 2, 8.0)
 

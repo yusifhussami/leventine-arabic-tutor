@@ -36,17 +36,14 @@ class _Response:
 
 
 def _payload(uses: bool, fits: bool, comment: str) -> dict:
-    text = json.dumps(
-        {"uses_target": uses, "fits_meaning": fits, "comment": comment}
-    )
     return {
-        "candidates": [
+        "choices": [
             {
-                "content": {
-                    "parts": [
-                        {"thought": True, "text": "checking the digits"},
-                        {"text": text},
-                    ]
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        {"uses_target": uses, "fits_meaning": fits, "comment": comment}
+                    ),
                 }
             }
         ]
@@ -56,13 +53,13 @@ def _payload(uses: bool, fits: bool, comment: str) -> dict:
 class JudgeTests(unittest.TestCase):
     def test_request_stays_a_closed_judgment(self) -> None:
         body = request_body("prompt")
-        config = body["generationConfig"]
-        self.assertEqual(config["temperature"], 0)
-        self.assertEqual(config["thinkingConfig"], {"thinkingLevel": "minimal"})
-        self.assertEqual(config["responseMimeType"], "application/json")
+        self.assertEqual(body["model"], "google/gemini-3.5-flash-lite")
+        self.assertEqual(body["temperature"], 0)
+        self.assertEqual(body["reasoning"], {"effort": "minimal"})
+        self.assertEqual(body["response_format"]["type"], "json_schema")
         self.assertNotIn("tools", body)
 
-    def test_thought_part_is_ignored(self) -> None:
+    def test_message_content_is_the_judgment(self) -> None:
         uses, fits, comment = parse_judgment(_payload(True, False, "wrong person"))
         self.assertEqual((uses, fits, comment), (True, False, "wrong person"))
 
@@ -130,7 +127,7 @@ class JudgeTests(unittest.TestCase):
                 card = session.cards[0]
 
                 def opener(request, timeout):
-                    self.assertEqual(request.get_header("X-goog-api-key"), "test-key")
+                    self.assertEqual(request.get_header("Authorization"), "Bearer test-key")
                     self.assertNotIn("key=", request.full_url)
                     return _Response(_payload(True, True, "holiday is used"))
 
@@ -141,7 +138,7 @@ class JudgeTests(unittest.TestCase):
                     "SELECT attempt_id, model, comment FROM judgments"
                 ).fetchone()
                 self.assertEqual(row["attempt_id"], result.attempt_id)
-                self.assertEqual(row["model"], "gemini-3.5-flash-lite")
+                self.assertEqual(row["model"], "google/gemini-3.5-flash-lite")
                 self.assertEqual(row["comment"], "holiday is used")
                 with self.assertRaises(sqlite3.IntegrityError):
                     conn.execute(
