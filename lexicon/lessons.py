@@ -82,8 +82,9 @@ def classify_entry(row: sqlite3.Row) -> EntryKind:
 
     blank is both fields empty. reversed is English in the word column and one
     Arabizi token as the meaning. grammar is a lesson label, not a word whose
-    gloss happens to name a tense. phrase and word are not decided yet, so any
-    other filled row still raises.
+    gloss happens to name a tense. A phrase has a space you would say. A slash
+    alternative or a parenthetical paradigm stays one word. A headword with no
+    gloss is still unlabeled.
     """
     word = (row["word"] or "").strip()
     meaning = (row["meaning"] or "").strip()
@@ -93,7 +94,11 @@ def classify_entry(row: sqlite3.Row) -> EntryKind:
         return "reversed"
     if _is_grammar(word, meaning):
         return "grammar"
-    raise NotImplementedError("phrase and word are not classified yet")
+    if meaning == "":
+        raise NotImplementedError("a headword with no gloss is not classified yet")
+    if _is_phrase(word):
+        return "phrase"
+    return "word"
 
 
 def _is_reversed(word: str, meaning: str) -> bool:
@@ -143,4 +148,29 @@ def _is_grammar(word: str, meaning: str) -> bool:
 def _normalize_label(text: str) -> str:
     text = " ".join(text.casefold().split())
     return text.replace(" /", "/").replace("/ ", "/")
+
+
+def _is_phrase(word: str) -> bool:
+    """True when the spelled utterance itself contains more than one word.
+
+    Text inside parentheses is a note about the headword, such as a paradigm.
+    Spaces that only separate slash alternatives, as in "5abar / a5bar", are
+    two forms of one entry.
+    """
+    uttered = _without_parentheticals(word).strip()
+    collapsed = uttered.replace(" / ", "/").replace(" /", "/").replace("/ ", "/")
+    return any(ch.isspace() for ch in collapsed)
+
+
+def _without_parentheticals(text: str) -> str:
+    kept: list[str] = []
+    depth = 0
+    for char in text:
+        if char == "(":
+            depth += 1
+        elif char == ")" and depth:
+            depth -= 1
+        elif depth == 0:
+            kept.append(char)
+    return "".join(kept)
 

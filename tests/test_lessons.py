@@ -47,11 +47,11 @@ class LessonTests(unittest.TestCase):
         blank = latest_lesson(self.conn)[0]
         self.assertEqual(classify_entry(blank), "blank")
 
-    def test_filled_row_is_not_classified_yet(self) -> None:
+    def test_a_single_glossed_spelling_is_a_word(self) -> None:
         load_entries(self.conn, self.csv_path)
         filled = latest_lesson(self.conn)[1]
-        with self.assertRaises(NotImplementedError):
-            classify_entry(filled)
+        self.assertEqual(filled["word"], "6alab")
+        self.assertEqual(classify_entry(filled), "word")
 
     def test_swapped_columns_are_reversed(self) -> None:
         path = Path(self.tmp.name) / "swapped.csv"
@@ -72,10 +72,8 @@ class LessonTests(unittest.TestCase):
         self.assertEqual(classify_entry(rows["to expect"]), "reversed")
         self.assertEqual(classify_entry(rows["joking"]), "reversed")
         self.assertEqual(classify_entry(rows["England"]), "reversed")
-        with self.assertRaises(NotImplementedError):
-            classify_entry(rows["fakker"])
-        with self.assertRaises(NotImplementedError):
-            classify_entry(rows["ijazeh"])
+        self.assertEqual(classify_entry(rows["fakker"]), "word")
+        self.assertEqual(classify_entry(rows["ijazeh"]), "word")
 
     def test_grammar_notes_are_not_the_words_they_describe(self) -> None:
         path = Path(self.tmp.name) / "grammar.csv"
@@ -97,9 +95,30 @@ class LessonTests(unittest.TestCase):
             [classify_entry(row) for row in rows[:4]],
             ["grammar", "grammar", "grammar", "grammar"],
         )
-        for row in rows[4:]:
-            with self.assertRaises(NotImplementedError):
-                classify_entry(row)
+        self.assertEqual([classify_entry(row) for row in rows[4:]], ["word", "word", "word", "word"])
+
+    def test_a_spoken_space_is_a_phrase_and_a_note_is_not(self) -> None:
+        path = Path(self.tmp.name) / "phrases.csv"
+        path.write_text(
+            "Word,Category,Date Added,Imperative,Meaning,Status\n"
+            "met3ale2een feni,,13 September 2026 13:07,No,relatable to me,\n"
+            "bas,Core and Connectors,18 June 2026 15:15,No,but,\n"
+            "5abar / a5bar,People and Places,18 June 2026 15:15,No,news,\n"
+            "rakad (rakked-base/imp),Verbs,18 June 2026 15:15,No,to run,\n"
+            "Homework,,12 July 2026 13:25,No,,\n",
+            encoding="utf-8",
+        )
+        load_entries(self.conn, path)
+        rows = {
+            row["word"]: row
+            for row in self.conn.execute("SELECT word, meaning FROM entries")
+        }
+        self.assertEqual(classify_entry(rows["met3ale2een feni"]), "phrase")
+        self.assertEqual(classify_entry(rows["bas"]), "word")
+        self.assertEqual(classify_entry(rows["5abar / a5bar"]), "word")
+        self.assertEqual(classify_entry(rows["rakad (rakked-base/imp)"]), "word")
+        with self.assertRaises(NotImplementedError):
+            classify_entry(rows["Homework"])
 
 
 if __name__ == "__main__":
