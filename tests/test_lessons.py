@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lexicon.lessons import latest_lesson, parse_date_added
+from lexicon.lessons import classify_entry, latest_lesson, parse_date_added
 from lexicon.load import connect, load_entries
 
 from tests.test_load import CSV
@@ -41,6 +41,17 @@ class LessonTests(unittest.TestCase):
             latest_lesson(self.conn)
         with self.assertRaises(ValueError):
             parse_date_added("13 Sep 2026 13:15")
+
+    def test_blank_row_is_blank(self) -> None:
+        load_entries(self.conn, self.csv_path)
+        blank = latest_lesson(self.conn)[0]
+        self.assertEqual(classify_entry(blank), "blank")
+
+    def test_filled_row_is_not_classified_yet(self) -> None:
+        load_entries(self.conn, self.csv_path)
+        filled = latest_lesson(self.conn)[1]
+        with self.assertRaises(NotImplementedError):
+            classify_entry(filled)
 
 
 if __name__ == "__main__":

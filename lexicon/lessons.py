@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime
+from typing import Literal
 
 _MONTHS = {
     "january": 1,
@@ -51,7 +52,7 @@ def latest_lesson(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """Return the rows added on the newest day, earliest time first.
 
     Rows are returned as stored. A blank row or a repeated spelling stays in
-    the result; deciding what kind of row it is happens later.
+    the result. classify_entry labels a row; it does not remove one.
     """
     rows = conn.execute(
         """
@@ -67,3 +68,23 @@ def latest_lesson(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     on_day = [(added, row) for added, row in dated if added.date() == newest]
     on_day.sort(key=lambda item: (item[0], item[1]["source_row"]))
     return [row for _, row in on_day]
+
+
+EntryKind = Literal["blank", "reversed", "grammar", "phrase", "word"]
+
+
+def classify_entry(row: sqlite3.Row) -> EntryKind:
+    """Label one stored row for practice.
+
+    blank is both the word and the meaning being empty. reversed, grammar,
+    phrase, and word depend on the text and are not decided yet, so a filled
+    row raises until those rules exist.
+    """
+    word = (row["word"] or "").strip()
+    meaning = (row["meaning"] or "").strip()
+    if word == "" and meaning == "":
+        return "blank"
+    raise NotImplementedError(
+        "reversed, grammar, phrase, and word are not classified yet"
+    )
+
