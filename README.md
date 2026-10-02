@@ -1,8 +1,8 @@
-# Levantine Arabic tutor
+# Sawt
 
-This is the notebook I use between lessons. After class I paste the new words in Arabizi, each one with its English meaning. Before the next class I pick a word and try to write a sentence with it.
+Sawt is the notebook I use between Levantine lessons. After class I paste the new words in Arabizi, each one with its English meaning. Before the next class I pick a word and try to write a sentence with it.
 
-The page is a small Mac window that runs on this computer. Nothing about the lessons is sent anywhere except the sentence check, which goes to OpenRouter.
+The page is a small window that runs on this computer. Words and the calendar link stay here. A sentence check, a Talk reply, and the spoken Arabic go to OpenRouter.
 
 ## Use it
 
@@ -14,9 +14,19 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
 
 - **Today** is where a lesson gets pasted. One line is `baza5 = fancy`. A line can also chain several pairs. Preview shows the split before you save.
 - **Words** lists everything saved, grouped by the lesson date. Edit changes the Arabizi or the English on that word. A spelling with a space is stored as a phrase.
-- **Practice** opens when you click a word. Similar meanings are listed, then you type a sentence and check it.
+- **Practice** opens when you click a word. Similar meanings are listed, then you type a sentence and check it. Talk speaks the reply as an mp3, so a phone hears it too.
 
 The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the local database. It is not printed on the page and it is not included in errors.
+
+## On a phone
+
+`127.0.0.1` only works on the computer running the notebook. On the same Wi‑Fi, start it on the local network and open that address on the phone:
+
+```bash
+python3 -m lexicon.serve --host 0.0.0.0
+```
+
+Then visit `http://` followed by this computer's local IP and `:8765`. Anyone who opens that address can use your words and your API key, so don't use it on a public network. The voice is Gemini Flash Lite TTS, about a cent a minute.
 
 ## Keep the key local
 

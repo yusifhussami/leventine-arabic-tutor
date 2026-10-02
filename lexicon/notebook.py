@@ -9,7 +9,16 @@ import urllib.request
 from datetime import datetime, timezone
 
 from lexicon.intake import item_kind, parse_lesson_text
-from lexicon.judge import MODEL, RateLimiter, call_model, read_api_key
+from lexicon.judge import (
+    MODEL,
+    RateLimiter,
+    _json_body,
+    call_model,
+    complete,
+    message_text,
+    read_api_key,
+)
+from lexicon.load import normalize_meaning, normalize_word
 from lexicon.lessons import parse_date_added
 from lexicon.practice import PracticeCard, PracticeSession, _oriented
 from lexicon.prompt import build_prompt
@@ -21,14 +30,61 @@ _IMPORT_MARK = "imported from vocabulary.csv"
 _BATCH = 64
 
 
+def _known_pairs(conn: sqlite3.Connection) -> set[tuple[str, str]]:
+    rows = conn.execute("SELECT spelling, gloss FROM lesson_items").fetchall()
+    return {(normalize_word(row["spelling"]), normalize_meaning(row["gloss"])) for row in rows}
+
+
+def drop_exact_duplicates(conn: sqlite3.Connection) -> int:
+    """Keep the newest copy of a spelling with the same meaning. Other glosses stay."""
+    rows = conn.execute(
+        """
+        SELECT i.id, i.spelling, i.gloss
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        ORDER BY l.learned_on DESC, l.id DESC, i.id DESC
+        """
+    ).fetchall()
+    seen: set[tuple[str, str]] = set()
+    remove: list[int] = []
+    for row in rows:
+        key = (normalize_word(row["spelling"]), normalize_meaning(row["gloss"]))
+        if not key[0]:
+            continue
+        if key in seen:
+            remove.append(row["id"])
+        else:
+            seen.add(key)
+    if remove:
+        with conn:
+            conn.executemany("DELETE FROM lesson_items WHERE id = ?", [(item_id,) for item_id in remove])
+    return len(remove)
+
+
 def save_lesson(
     conn: sqlite3.Connection,
     learned_on: str,
     raw_text: str,
     embed=None,
 ) -> dict:
-    """Parse the paste, store the lesson, and attach a gloss vector when one exists."""
-    pairs = [(spelling, gloss) for spelling, gloss in parse_lesson_text(raw_text)]
+    """Parse the paste, store the lesson, and attach a gloss vector when one exists.
+
+    A spelling with the same meaning as one already saved is not stored again.
+    """
+    parsed = [(spelling, gloss) for spelling, gloss in parse_lesson_text(raw_text)]
+    known = _known_pairs(conn)
+    pairs = []
+    skipped = []
+    for spelling, gloss in parsed:
+        key = (normalize_word(spelling), normalize_meaning(gloss))
+        if not key[0] or key in known:
+            skipped.append({"spelling": spelling, "gloss": gloss})
+            continue
+        known.add(key)
+        pairs.append((spelling, gloss))
+    if not pairs:
+        names = ", ".join(item["spelling"] for item in skipped)
+        raise ValueError(f"already saved: {names}")
     if embed is None:
         embed = embed_glosses
     try:
@@ -72,7 +128,7 @@ def save_lesson(
                     "kind": item_kind(spelling),
                 }
             )
-    return {"id": lesson_id, "learned_on": learned_on, "items": items}
+    return {"id": lesson_id, "learned_on": learned_on, "items": items, "skipped": skipped}
 
 
 def import_sheet(conn: sqlite3.Connection, embed=None) -> dict:
@@ -262,6 +318,10 @@ def update_item(
     ).fetchone()
     if current is None:
         raise LookupError(f"no item {item_id}")
+    key = (normalize_word(spelling), normalize_meaning(gloss))
+    for other in conn.execute("SELECT id, spelling, gloss FROM lesson_items WHERE id != ?", (item_id,)):
+        if (normalize_word(other["spelling"]), normalize_meaning(other["gloss"])) == key:
+            raise ValueError("that word is already saved")
     kind = item_kind(spelling)
     vector = None
     if current["gloss"] != gloss:
@@ -414,6 +474,136 @@ def cosine(left: list[float], right: list[float]) -> float:
     if left_norm == 0 or right_norm == 0:
         return 0.0
     return dot / (left_norm * right_norm)
+
+
+_TALK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "you_arabizi": {"type": "string"},
+        "you_english": {"type": "string"},
+        "arabic": {"type": "string"},
+        "arabizi": {"type": "string"},
+        "english": {"type": "string"},
+        "correction": {"type": "string"},
+        "better": {"type": "string"},
+    },
+    "required": [
+        "you_arabizi",
+        "you_english",
+        "arabic",
+        "arabizi",
+        "english",
+        "correction",
+        "better",
+    ],
+    "additionalProperties": False,
+}
+_TALK_WORDS = 180
+_SCENES = {
+    "coffee": (
+        "You are the person at the counter of a coffee shop. The learner is ordering.\n"
+        "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
+        "Use these spellings: ahwe, baddi, 7elo, bala sukkar, kbeer, zgheer, 8addeesh.\n"
+        "Ask only one of those in a turn, the way a real counter does. If they miss it or say it awkwardly, put the useful line in better.\n"
+    ),
+    "restaurant": (
+        "You are the server in a restaurant. The learner is ordering food.\n"
+        "Stay in that scene. Help them ask for a dish, without spice, extra, and the bill.\n"
+        "Use these spellings: baddi, bala 7ar, extra, el 7seb.\n"
+        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+    ),
+    "shop": (
+        "You are the shopkeeper. The learner wants to buy something.\n"
+        "Stay in that scene. Help them point to an item, ask the price, and ask for a cheaper one.\n"
+        "Use these spellings: hayda, 8addeesh, ar5as.\n"
+        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+    ),
+    "taxi": (
+        "You are the taxi driver. The learner is a passenger.\n"
+        "Stay in that scene. Help them name the destination, ask the price, and say stop here.\n"
+        "Use these spellings: 3a, 8addeesh, wa22ef hon.\n"
+        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+    ),
+}
+
+
+def talk(conn: sqlite3.Connection, turns: list, api_key: str, opener=None, pace=None, scene: str = "") -> dict:
+    """One short Levantine reply that prefers words already saved.
+
+    The newest saved words are the ones the model sees, so a turn stays small.
+    The Mac speaks the Arabic line. Arabizi and English are for the page.
+    """
+    history = _talk_turns(turns)
+    drop_exact_duplicates(conn)
+    seen: set[str] = set()
+    chosen = []
+    for item in list_items(conn):
+        key = normalize_word(item["spelling"])
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        chosen.append(item)
+        if len(chosen) == _TALK_WORDS:
+            break
+    if not chosen:
+        raise ValueError("save a few words first")
+    vocab = "\n".join(f"{item['spelling']} = {item['gloss']}" for item in chosen)
+    spoken = "\n".join(f"{turn['role']}: {turn['text']}" for turn in history)
+    prompt = (
+        "You are a Levantine friend on a voice call, not a teacher giving a lesson.\n"
+        "Answer in one or two short spoken sentences, the way people actually talk.\n"
+        "Prefer the learner's saved words when they fit. Each spelling is listed once.\n"
+        "Do not repeat a line you already said in this conversation. Do not quiz them.\n"
+        "Spell Arabizi the way this notebook does, lowercase, and copy a saved word exactly when you use it.\n"
+        "2 is ء or أ, 3 is ع, 3' is غ, 5 is خ, 6 is ط, 7 is ح, 8 is ق, 9 is ص, 9' is ض.\n"
+        "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
+        "you_arabizi is what the learner just said, in that spelling. No Arabic script there.\n"
+        "you_english is a plain translation of that line.\n"
+        "arabic is the Arabic script you would say out loud.\n"
+        "arabizi is that same reply spelled the way the learner writes.\n"
+        "english is a plain one-line gloss of your reply.\n"
+        "If the latest user line begins with Start, you speak first in the scene and leave you_arabizi and you_english empty.\n"
+        "If their Levantine is off, set correction to one kind sentence about what was off,\n"
+        "and better to a fuller way they could say it, in Arabizi. If it was fine, leave both empty.\n"
+        + (f"\n{_SCENES[scene]}\n" if scene in _SCENES else "\n")
+        + "Saved words, newest first:\n"
+        f"{vocab}\n"
+        "\n"
+        "Conversation:\n"
+        f"{spoken}\n"
+    )
+    body = _json_body(prompt, "reply", _TALK_SCHEMA, temperature=0.4)
+    body["max_tokens"] = 280
+    if opener is None:
+        opener = urllib.request.urlopen
+    payload = complete(body, api_key, opener, pace=pace)
+    data = json.loads(message_text(payload))
+    return {
+        "you_arabizi": str(data["you_arabizi"]).strip(),
+        "you_english": str(data["you_english"]).strip(),
+        "arabic": str(data["arabic"]).strip(),
+        "arabizi": str(data["arabizi"]).strip(),
+        "english": str(data["english"]).strip(),
+        "correction": str(data["correction"]).strip(),
+        "better": str(data["better"]).strip(),
+    }
+
+
+def _talk_turns(turns: list) -> list[dict]:
+    if not isinstance(turns, list) or not turns:
+        raise ValueError("say something first")
+    history = []
+    for turn in turns[-6:]:
+        if not isinstance(turn, dict):
+            raise ValueError("say something first")
+        role = turn.get("role")
+        text = str(turn.get("text") or "").strip()
+        if role not in ("user", "assistant") or not text:
+            raise ValueError("say something first")
+        history.append({"role": role, "text": text[:400]})
+    if history[-1]["role"] != "user":
+        raise ValueError("say something first")
+    return history
 
 
 def embed_glosses(glosses: list[str], opener=urllib.request.urlopen) -> list[list[float]]:

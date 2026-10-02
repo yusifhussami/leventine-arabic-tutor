@@ -118,20 +118,24 @@ def read_api_key(env_path: Path | str = ".env") -> str:
 
 def request_body(prompt: str) -> dict:
     """One user turn, a JSON judgment, and the cheapest reasoning level."""
+    return _json_body(prompt, "judgment", _SCHEMA)
+
+
+def _json_body(prompt: str, name: str, schema: dict, temperature: float = 0) -> dict:
     return {
         "model": MODEL,
-        "temperature": 0,
+        "temperature": temperature,
         "messages": [{"role": "user", "content": prompt}],
         "response_format": {
             "type": "json_schema",
-            "json_schema": {"name": "judgment", "strict": True, "schema": _SCHEMA},
+            "json_schema": {"name": name, "strict": True, "schema": schema},
         },
         "reasoning": {"effort": "minimal"},
     }
 
 
-def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
-    """Read uses_target, fits_meaning, and comment from a chat completion."""
+def message_text(payload: dict) -> str:
+    """Read the assistant string from a chat completion."""
     choices = payload.get("choices") or []
     if not choices:
         raise ValueError("model returned no choices")
@@ -140,7 +144,12 @@ def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
         content = "".join(
             part.get("text", "") for part in content if isinstance(part, dict)
         )
-    data = json.loads(content)
+    return content
+
+
+def parse_judgment(payload: dict) -> tuple[bool, bool, str]:
+    """Read uses_target, fits_meaning, and comment from a chat completion."""
+    data = json.loads(message_text(payload))
     return bool(data["uses_target"]), bool(data["fits_meaning"]), str(data["comment"])
 
 
@@ -176,12 +185,24 @@ def call_model(
     Calls are spaced, and a rate-limit or outage response is retried. A bad
     request is not retried.
     """
+    payload = complete(request_body(prompt), api_key, opener, pace, sleep)
+    return parse_judgment(payload)
+
+
+def complete(
+    body: dict,
+    api_key: str,
+    opener=urllib.request.urlopen,
+    pace: RateLimiter | None = None,
+    sleep=time.sleep,
+) -> dict:
+    """POST one chat body. Retries the same way a judgment call does."""
     (pace or _PACE).wait()
     delay = 1.0
     for attempt in range(_MAX_ATTEMPTS):
         request = urllib.request.Request(
             ENDPOINT,
-            data=json.dumps(request_body(prompt)).encode(),
+            data=json.dumps(body).encode(),
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
@@ -190,14 +211,14 @@ def call_model(
         )
         try:
             with opener(request, timeout=30) as response:
-                payload = json.loads(response.read().decode())
-            return parse_judgment(payload)
+                return json.loads(response.read().decode())
         except urllib.error.HTTPError as exc:
             if exc.code not in _RETRYABLE or attempt == _MAX_ATTEMPTS - 1:
                 detail = exc.read().decode(errors="replace")[:500]
                 raise RuntimeError(f"OpenRouter request failed ({exc.code}): {detail}") from exc
             sleep(_retry_delay(exc, delay))
             delay = min(delay * 2, 8.0)
+    raise RuntimeError("OpenRouter request failed")
 
 
 def _retry_delay(exc: urllib.error.HTTPError, fallback: float) -> float:

@@ -13,13 +13,16 @@ from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.load import connect
 from lexicon.notebook import (
+    drop_exact_duplicates,
     judge_saved_item,
     list_items,
     save_lesson,
     search_items,
     similar_items,
+    talk,
     update_item,
 )
+from lexicon.speak import arabic_speech
 
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 DB_PATH = Path("lexicon.db")
@@ -49,6 +52,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
         if path == "/api/items":
             conn = connect(DB_PATH)
             try:
+                drop_exact_duplicates(conn)
                 query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
                 self._json(200, search_items(conn, query) if query.strip() else list_items(conn))
             finally:
@@ -99,6 +103,23 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 finally:
                     conn.close()
                 self._json(200, saved)
+                return
+            if path == "/api/talk":
+                conn = connect(DB_PATH)
+                try:
+                    reply = talk(
+                        conn,
+                        body.get("turns") or [],
+                        read_api_key(),
+                        scene=body.get("scene") or "",
+                    )
+                finally:
+                    conn.close()
+                self._json(200, reply)
+                return
+            if path == "/api/speak":
+                audio = arabic_speech(body.get("text") or "", read_api_key())
+                self._bytes(200, audio, "audio/wav")
                 return
             if path == "/api/practice":
                 conn = connect(DB_PATH)
@@ -164,14 +185,15 @@ class NotebookHandler(BaseHTTPRequestHandler):
 
 def main(argv: list[str] | None = None) -> None:
     global DB_PATH
-    parser = argparse.ArgumentParser(description="Open the lesson notebook in a browser.")
+    parser = argparse.ArgumentParser(description="Open Sawt in a browser.")
     parser.add_argument("db_path", nargs="?", type=Path, default=Path("lexicon.db"))
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
     DB_PATH = args.db_path
     connect(DB_PATH).close()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), NotebookHandler)
-    print(f"http://127.0.0.1:{args.port}")
+    server = ThreadingHTTPServer((args.host, args.port), NotebookHandler)
+    print(f"http://{args.host}:{args.port}")
     server.serve_forever()
 
 

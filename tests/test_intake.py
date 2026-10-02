@@ -1,8 +1,10 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from lexicon.intake import parse_lesson_text
+from lexicon.judge import RateLimiter
 from lexicon.load import connect, flag_duplicates, load_entries
 from lexicon.notebook import (
     import_sheet,
@@ -10,6 +12,7 @@ from lexicon.notebook import (
     save_lesson,
     search_items,
     similar_items,
+    talk,
     update_item,
 )
 
@@ -17,6 +20,22 @@ SAMPLE = (
     "baza5 = fancy we7deh = loneliness "
     "7ayat al baza5 fiha we7deh = rich life has loneliness"
 )
+
+
+class _TalkResponse:
+    def __init__(self, data: dict) -> None:
+        self._payload = json.dumps(
+            {"choices": [{"message": {"content": json.dumps(data)}}]}
+        ).encode()
+
+    def read(self) -> bytes:
+        return self._payload
+
+    def __enter__(self) -> "_TalkResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
 
 
 def _vectors(glosses: list[str]) -> list[list[float]]:
@@ -43,6 +62,19 @@ class IntakeTests(unittest.TestCase):
     def test_one_pair_per_line(self) -> None:
         pairs = parse_lesson_text("bas = but\namma = as for / but\n")
         self.assertEqual(pairs, [("bas", "but"), ("amma", "as for / but")])
+
+    def test_english_dash_arabizi_and_equals_split_each_word(self) -> None:
+        pairs = parse_lesson_text(
+            "practice - tadreeb to train - etdarrab 8ararat = decisions"
+        )
+        self.assertEqual(
+            pairs,
+            [
+                ("tadreeb", "practice"),
+                ("etdarrab", "to train"),
+                ("8ararat", "decisions"),
+            ],
+        )
 
 
 class NotebookTests(unittest.TestCase):
@@ -95,6 +127,47 @@ class NotebookTests(unittest.TestCase):
             update_item(self.conn, item_id, " ", "fancy", embed=unused)
         with self.assertRaises(LookupError):
             update_item(self.conn, 999, "bas", "but", embed=unused)
+
+    def test_saving_the_same_word_again_does_not_keep_a_copy(self) -> None:
+        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+        with self.assertRaises(ValueError):
+            save_lesson(self.conn, "2026-10-02", SAMPLE, embed=_vectors)
+        self.assertEqual(len(list_items(self.conn)), 3)
+        saved = save_lesson(self.conn, "2026-10-02", "baza5 = fancy\nbas = but", embed=lambda glosses: [[0.0, 0.0]])
+        self.assertEqual([item["spelling"] for item in saved["items"]], ["bas"])
+        self.assertEqual([item["spelling"] for item in saved["skipped"]], ["baza5"])
+        self.assertEqual(len(list_items(self.conn)), 4)
+
+    def test_talk_replies_from_saved_words(self) -> None:
+        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+
+        def opener(request, timeout):
+            body = json.loads(request.data.decode())
+            self.assertIn("baza5 = fancy", body["messages"][0]["content"])
+            self.assertIn("keefak", body["messages"][0]["content"])
+            self.assertEqual(body["max_tokens"], 280)
+            return _TalkResponse(
+                {
+                    "you_arabizi": "mar7aba",
+                    "you_english": "hello",
+                    "arabic": "كيفك",
+                    "arabizi": "kifak",
+                    "english": "how's it going",
+                    "correction": "",
+                    "better": "",
+                }
+            )
+
+        reply = talk(
+            self.conn,
+            [{"role": "user", "text": "hi"}],
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0),
+        )
+        self.assertEqual(reply["arabizi"], "kifak")
+        with self.assertRaises(ValueError):
+            talk(self.conn, [], "test-key", opener, pace=RateLimiter(min_interval=0))
 
     def test_sheet_import_is_searchable_by_spelling_and_meaning(self) -> None:
         csv_path = Path(self.tmp.name) / "vocab.csv"
