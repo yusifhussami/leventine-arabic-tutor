@@ -32,6 +32,11 @@ if not PAGE.exists():
 DB_PATH = Path("lexicon.db")
 
 
+def _db():
+    """Local serve always uses the SQLite file, even when .env has DATABASE_URL."""
+    return open_db(DB_PATH, sqlite_only=True)
+
+
 class NotebookHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
@@ -42,14 +47,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
             self._json(200, {"clerkPublishableKey": "", "authRequired": False})
             return
         if path == "/api/settings":
-            conn = open_db(DB_PATH)
+            conn = _db()
             try:
                 self._json(200, {"language": get_language(conn, LOCAL_USER)})
             finally:
                 conn.close()
             return
         if path == "/api/next-lesson":
-            conn = open_db(DB_PATH)
+            conn = _db()
             try:
                 if not calendar_connected(conn, LOCAL_USER):
                     self._json(200, {"connected": False, "lesson": None})
@@ -64,7 +69,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 conn.close()
             return
         if path == "/api/items":
-            conn = open_db(DB_PATH)
+            conn = _db()
             try:
                 language = get_language(conn, LOCAL_USER)
                 drop_exact_duplicates(conn, LOCAL_USER, language=language)
@@ -80,7 +85,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/items/") and path.endswith("/similar"):
             item_id = path.removeprefix("/api/items/").removesuffix("/similar").strip("/")
-            conn = open_db(DB_PATH)
+            conn = _db()
             try:
                 self._json(200, similar_items(conn, int(item_id), user_id=LOCAL_USER))
             except ValueError:
@@ -99,7 +104,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
             return
         try:
             if path == "/api/calendar":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     save_calendar_url(conn, body.get("url") or "", LOCAL_USER)
                 finally:
@@ -107,7 +112,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._json(200, {"connected": True})
                 return
             if path == "/api/settings":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     language = save_language(conn, body.get("language") or "", LOCAL_USER)
                 finally:
@@ -125,7 +130,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 )
                 return
             if path == "/api/lessons":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     saved = save_lesson(
                         conn,
@@ -139,7 +144,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._json(200, saved)
                 return
             if path == "/api/import-csv":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     saved = import_csv(
                         conn,
@@ -153,7 +158,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._json(200, saved)
                 return
             if path == "/api/talk":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     language = normalize_language(
                         body.get("language") or get_language(conn, LOCAL_USER)
@@ -179,7 +184,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._bytes(200, audio, "audio/wav")
                 return
             if path == "/api/practice":
-                conn = open_db(DB_PATH)
+                conn = _db()
                 try:
                     language = normalize_language(
                         body.get("language") or get_language(conn, LOCAL_USER)
@@ -220,7 +225,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
         except ValueError:
             self._json(404, {"error": "not found"})
             return
-        conn = open_db(DB_PATH)
+        conn = _db()
         try:
             updated = update_item(
                 conn,
@@ -259,7 +264,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
     DB_PATH = args.db_path
-    open_db(DB_PATH).close()
+    _db().close()
     server = ThreadingHTTPServer((args.host, args.port), NotebookHandler)
     print(f"http://{args.host}:{args.port}")
     server.serve_forever()

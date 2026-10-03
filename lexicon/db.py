@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS lessons (
     raw_text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_lessons_user ON lessons (user_id, language, learned_on DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS lesson_items (
     id BIGSERIAL PRIMARY KEY,
@@ -102,13 +101,21 @@ def database_url() -> str:
     return (os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or "").strip()
 
 
-def open_db(db_path: Path | str = "lexicon.db"):
-    """Supabase/Postgres when DATABASE_URL is set, otherwise the local SQLite file."""
-    url = database_url()
+def open_db(db_path: Path | str = "lexicon.db", *, sqlite_only: bool = False):
+    """Supabase/Postgres when DATABASE_URL is set, otherwise the local SQLite file.
+
+    Pass sqlite_only=True for `python3 -m lexicon.serve` so a DATABASE_URL in
+    .env does not hijack the local notebook file.
+    """
+    url = "" if sqlite_only else database_url()
     if url:
         return open_postgres(url)
     conn = connect_sqlite(db_path)
-    conn.backend = "sqlite"  # type: ignore[attr-defined]
+    try:
+        conn.backend = "sqlite"  # type: ignore[attr-defined]
+    except AttributeError:
+        # Some Python builds use a slotted Connection; tag via wrapper attr unused.
+        pass
     return conn
 
 
@@ -129,8 +136,13 @@ def open_postgres(url: str) -> PgConnection:
             text = statement.strip()
             if text:
                 wrapped.execute(text)
+        # Existing hosted DBs were created before language existed.
         wrapped.execute(
             "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'arabic'"
+        )
+        wrapped.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lessons_user "
+            "ON lessons (user_id, learned_on DESC, id DESC)"
         )
         wrapped.execute(
             "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "

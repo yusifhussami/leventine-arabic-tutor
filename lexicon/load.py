@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS lessons (
     created_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_lessons_user
-    ON lessons (user_id, language, learned_on DESC, id DESC);
+-- Indexes that need user_id/language are created in migrate_notebook_schema
+-- after older local databases get those columns.
 
 CREATE TABLE IF NOT EXISTS lesson_items (
     id INTEGER PRIMARY KEY,
@@ -151,6 +151,8 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # Create missing tables first. Migrate older local DBs before any index that
+    # needs user_id / language — CREATE INDEX would otherwise fail on old files.
     conn.executescript(SCHEMA)
     migrate_notebook_schema(conn)
     path = Path(db_path)
@@ -161,35 +163,44 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
 
 def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
     """Add user_id / language columns for older local databases."""
-    lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
-    if lesson_cols and "user_id" not in lesson_cols:
-        conn.execute("ALTER TABLE lessons ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'")
-        conn.commit()
-    lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
-    if lesson_cols and "language" not in lesson_cols:
-        conn.execute("ALTER TABLE lessons ADD COLUMN language TEXT NOT NULL DEFAULT 'arabic'")
-        conn.commit()
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
-        "ON lessons (user_id, language, learned_on DESC, id DESC)"
-    )
-    setting_cols = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
-    if setting_cols and "user_id" not in setting_cols:
-        conn.executescript(
-            """
-            CREATE TABLE settings_v2 (
-                user_id TEXT NOT NULL,
-                key TEXT NOT NULL,
-                value TEXT NOT NULL,
-                PRIMARY KEY (user_id, key)
-            );
-            INSERT INTO settings_v2 (user_id, key, value)
-            SELECT 'local', key, value FROM settings;
-            DROP TABLE settings;
-            ALTER TABLE settings_v2 RENAME TO settings;
-            """
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
         )
-        conn.commit()
+    }
+    if "lessons" in tables:
+        lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
+        if "user_id" not in lesson_cols:
+            conn.execute(
+                "ALTER TABLE lessons ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'"
+            )
+        lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
+        if "language" not in lesson_cols:
+            conn.execute(
+                "ALTER TABLE lessons ADD COLUMN language TEXT NOT NULL DEFAULT 'arabic'"
+            )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
+            "ON lessons (user_id, language, learned_on DESC, id DESC)"
+        )
+    if "settings" in tables:
+        setting_cols = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
+        if setting_cols and "user_id" not in setting_cols:
+            conn.executescript(
+                """
+                CREATE TABLE settings_v2 (
+                    user_id TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    PRIMARY KEY (user_id, key)
+                );
+                INSERT INTO settings_v2 (user_id, key, value)
+                SELECT 'local', key, value FROM settings;
+                DROP TABLE settings;
+                ALTER TABLE settings_v2 RENAME TO settings;
+                """
+            )
     conn.commit()
 
 
