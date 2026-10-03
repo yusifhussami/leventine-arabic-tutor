@@ -14,6 +14,7 @@ from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.notebook import (
     drop_exact_duplicates,
+    import_csv,
     judge_saved_item,
     list_items,
     save_lesson,
@@ -22,6 +23,7 @@ from lexicon.notebook import (
     talk,
     update_item,
 )
+from lexicon.prefs import get_language, save_language
 from lexicon.speak import arabic_speech
 
 PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
@@ -38,6 +40,13 @@ class NotebookHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/config":
             self._json(200, {"clerkPublishableKey": "", "authRequired": False})
+            return
+        if path == "/api/settings":
+            conn = open_db(DB_PATH)
+            try:
+                self._json(200, {"language": get_language(conn, LOCAL_USER)})
+            finally:
+                conn.close()
             return
         if path == "/api/next-lesson":
             conn = open_db(DB_PATH)
@@ -96,6 +105,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     conn.close()
                 self._json(200, {"connected": True})
                 return
+            if path == "/api/settings":
+                conn = open_db(DB_PATH)
+                try:
+                    language = save_language(conn, body.get("language") or "", LOCAL_USER)
+                finally:
+                    conn.close()
+                self._json(200, {"language": language})
+                return
             if path == "/api/preview":
                 pairs = parse_lesson_text(body.get("text") or "")
                 self._json(
@@ -111,6 +128,19 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 try:
                     saved = save_lesson(
                         conn, body["learned_on"], body.get("text") or "", user_id=LOCAL_USER
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
+                return
+            if path == "/api/import-csv":
+                conn = open_db(DB_PATH)
+                try:
+                    saved = import_csv(
+                        conn,
+                        body.get("csv") or "",
+                        user_id=LOCAL_USER,
+                        default_day=body.get("learned_on") or None,
                     )
                 finally:
                     conn.close()

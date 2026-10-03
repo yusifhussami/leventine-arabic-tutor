@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f2f2f7">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
   <title>Sawt</title>
   <style>
     :root {
-      color-scheme: light;
+      color-scheme: light dark;
       --label: #000000;
       --secondary: rgba(60, 60, 67, 0.6);
       --tertiary: rgba(60, 60, 67, 0.3);
@@ -28,25 +29,26 @@
       --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
       --reading: ui-serif, "New York", "Iowan Old Style", Palatino, serif;
     }
-    :root[data-appearance="dark"] {
-      color-scheme: dark;
-      --label: #ffffff;
-      --secondary: rgba(235, 235, 245, 0.6);
-      --tertiary: rgba(235, 235, 245, 0.3);
-      --separator: #38383a;
-      --blue: #0a84ff;
-      --blue-text: #409cff;
-      --green: #30d158;
-      --switch: #30d158;
-      --orange: #ff9f0a;
-      --red: #ff453a;
-      --grouped: #000000;
-      --fill: #2c2c2e;
-      --fill-pressed: #3a3a3c;
-      --window: #1c1c1e;
-      --field: #2c2c2e;
-      --switch-off: #39393d;
-      --knob: #ffffff;
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --label: #ffffff;
+        --secondary: rgba(235, 235, 245, 0.6);
+        --tertiary: rgba(235, 235, 245, 0.3);
+        --separator: #38383a;
+        --blue: #0a84ff;
+        --blue-text: #409cff;
+        --green: #30d158;
+        --switch: #30d158;
+        --orange: #ff9f0a;
+        --red: #ff453a;
+        --grouped: #000000;
+        --fill: #2c2c2e;
+        --fill-pressed: #3a3a3c;
+        --window: #1c1c1e;
+        --field: #2c2c2e;
+        --switch-off: #39393d;
+        --knob: #ffffff;
+      }
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -141,7 +143,32 @@
       padding: 22px 20px 32px;
     }
     h2 { margin: 0 0 4px; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; }
-    .hint { margin: 0 0 18px; color: var(--secondary); font-size: 13px; }
+    .hint { margin: 0 0 10px; color: var(--secondary); font-size: 13px; }
+    .lesson-day {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+    }
+    .lesson-day label {
+      display: inline;
+      margin: 0;
+    }
+    .lesson-day input[type="date"] {
+      width: auto;
+      max-width: 11.5em;
+      padding: 2px 6px;
+      font-size: 13px;
+      color: var(--secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+    .lesson-day input[type="date"]:hover,
+    .lesson-day input[type="date"]:focus {
+      color: var(--label);
+      background: var(--field);
+      border-color: var(--separator);
+    }
     .kicker {
       margin: 0 0 8px;
       font-size: 11px;
@@ -235,6 +262,37 @@
     }
     #library tr:hover td { background: var(--grouped); }
     #library .empty { margin: 8px 2px; color: var(--secondary); }
+    .sheet-import {
+      margin-top: 28px;
+      padding-top: 22px;
+      border-top: 1px solid var(--separator);
+    }
+    .sheet-import h2 { margin: 0 0 6px; }
+    .sheet-import .hint { margin-bottom: 12px; }
+    .sheet-import .file-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .sheet-import input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+    .sheet-import .file-name {
+      margin: 0;
+      font-size: 13px;
+      color: var(--secondary);
+    }
+    .sheet-import .error { margin-top: 10px; }
+    .sheet-import .error.note { color: var(--secondary); }
+    #library .empty-import {
+      margin-top: 18px;
+      max-width: 420px;
+    }
     #library td input { min-height: 26px; }
     .edit-cell { text-align: right; white-space: nowrap; }
     button.text {
@@ -263,42 +321,6 @@
       background: var(--field);
     }
     .toolbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-    .switch {
-      position: relative;
-      width: 51px;
-      height: 31px;
-      flex-shrink: 0;
-    }
-    .switch input {
-      position: absolute;
-      inset: 0;
-      margin: 0;
-      opacity: 0;
-    }
-    .switch input:focus-visible { outline: none; }
-    .switch-track {
-      display: block;
-      width: 51px;
-      height: 31px;
-      border-radius: 16px;
-      background: var(--switch-off);
-      transition: background-color 0.2s ease;
-    }
-    .switch-track::after {
-      content: "";
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 27px;
-      height: 27px;
-      border-radius: 50%;
-      background: var(--knob);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      transition: transform 0.2s ease;
-    }
-    .switch input:checked + .switch-track { background: var(--switch); }
-    .switch input:checked + .switch-track::after { transform: translateX(20px); }
-    .switch input:focus-visible + .switch-track { outline: 3px solid var(--blue); outline-offset: 2px; }
     .sky {
       position: relative;
       width: 18px;
@@ -313,9 +335,11 @@
       transition: opacity 0.2s ease;
     }
     .sky .sun { color: #ffcc00; }
-    :root[data-appearance="dark"] .sky .sun { opacity: 0; }
     .sky .moon { opacity: 0; }
-    :root[data-appearance="dark"] .sky .moon { opacity: 1; }
+    @media (prefers-color-scheme: dark) {
+      .sky .sun { opacity: 0; }
+      .sky .moon { opacity: 1; }
+    }
     .recent { margin-top: 48px; }
     .recent[hidden] { display: none; }
     .recent h2 { margin-bottom: 4px; }
@@ -369,10 +393,6 @@
       box-shadow: inset 0 0 0 1px rgba(60, 60, 67, 0.08);
       flex-shrink: 0;
     }
-    :root[data-appearance="dark"] .orb {
-      background: #0b0b0d;
-      box-shadow: none;
-    }
     .orb i {
       position: absolute;
       left: 18%;
@@ -386,9 +406,15 @@
     }
     .orb i:nth-child(2) { background: #5ac8fa; left: 8%; top: 34%; }
     .orb i:nth-child(3) { background: #ffffff; left: 30%; top: 8%; opacity: 0.7; }
-    :root[data-appearance="dark"] .orb i { background: #0a84ff; opacity: 0.9; }
-    :root[data-appearance="dark"] .orb i:nth-child(2) { background: #64d2ff; }
-    :root[data-appearance="dark"] .orb i:nth-child(3) { background: #ffffff; opacity: 0.55; }
+    @media (prefers-color-scheme: dark) {
+      .orb {
+        background: #0b0b0d;
+        box-shadow: none;
+      }
+      .orb i { background: #0a84ff; opacity: 0.9; }
+      .orb i:nth-child(2) { background: #64d2ff; }
+      .orb i:nth-child(3) { background: #ffffff; opacity: 0.55; }
+    }
     .voice-state { margin: 0; font-size: 13px; color: var(--secondary); }
     .voice-line {
       margin: 0;
@@ -457,6 +483,13 @@
     #judgment.warn { color: var(--orange); }
     .empty-state { max-width: 420px; }
     .empty-state p { margin: 6px 0 0; font-size: 15px; line-height: 1.4; }
+    #pane-settings .document { max-width: 520px; }
+    #pane-settings section + section { margin-top: 36px; }
+    #pane-settings h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    #language-setup .language-picks { margin-top: 12px; }
+    #language-setup .language-picks button { color: var(--label); background: var(--fill); }
+    #language-setup .language-picks button[aria-pressed="true"] { color: #ffffff; background: var(--blue); }
+    #account-status { margin: 0 0 14px; }
     #calendar-setup { margin-top: 28px; }
     #calendar-setup[hidden] { display: none; }
     @media (max-width: 860px) {
@@ -479,13 +512,6 @@
     .auth-gate[hidden] { display: none; }
     .auth-gate h2 { margin: 0 0 8px; font-size: 22px; }
     .auth-gate p { margin: 0 0 18px; color: var(--secondary); max-width: 320px; }
-    #account-button {
-      border: 0;
-      background: transparent;
-      color: var(--blue-text);
-      font-weight: 600;
-      padding: 0 4px;
-    }
     @media (max-width: 720px) {
       .window { flex-direction: column; }
       .sidebar {
@@ -520,15 +546,19 @@
       <nav aria-label="Sections">
         <button class="tab active" type="button" data-tab="today" aria-current="page">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M8 3.5v3M16 3.5v3M4 10h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Today
+          <span data-i18n="tabToday">Today</span>
         </button>
         <button class="tab" type="button" data-tab="practice">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 18.5V6.8A2.8 2.8 0 0 1 8.8 4h8.7a.5.5 0 0 1 .5.5V17" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M9 8.5h6M9 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          Practice
+          <span data-i18n="tabPractice">Practice</span>
         </button>
         <button class="tab" type="button" data-tab="words">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h6.2A2.8 2.8 0 0 1 14 8.3V19a2.2 2.2 0 0 0-2.2-2.2H5V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 5.5h-6.2A2.8 2.8 0 0 0 10 8.3V19a2.2 2.2 0 0 1 2.2-2.2H19V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-          Words
+          <span data-i18n="tabWords">Words</span>
+        </button>
+        <button class="tab" type="button" data-tab="settings">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 13.1a1.4 1.4 0 0 0 .28 1.54l.06.06a1.7 1.7 0 1 1-2.4 2.4l-.06-.06a1.4 1.4 0 0 0-1.54-.28 1.4 1.4 0 0 0-.85 1.28V18a1.7 1.7 0 1 1-3.4 0v-.1a1.4 1.4 0 0 0-.92-1.28 1.4 1.4 0 0 0-1.54.28l-.06.06a1.7 1.7 0 1 1-2.4-2.4l.06-.06a1.4 1.4 0 0 0 .28-1.54 1.4 1.4 0 0 0-1.28-.85H6a1.7 1.7 0 1 1 0-3.4h.1a1.4 1.4 0 0 0 1.28-.92 1.4 1.4 0 0 0-.28-1.54l-.06-.06a1.7 1.7 0 1 1 2.4-2.4l.06.06a1.4 1.4 0 0 0 1.54.28h.08A1.4 1.4 0 0 0 12 4.1V4a1.7 1.7 0 1 1 3.4 0v.1a1.4 1.4 0 0 0 .85 1.28 1.4 1.4 0 0 0 1.54-.28l.06-.06a1.7 1.7 0 1 1 2.4 2.4l-.06.06a1.4 1.4 0 0 0-.28 1.54v.08a1.4 1.4 0 0 0 1.28.85H20a1.7 1.7 0 1 1 0 3.4h-.1a1.4 1.4 0 0 0-1.28.85Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span data-i18n="tabSettings">Settings</span>
         </button>
       </nav>
     </aside>
@@ -541,7 +571,7 @@
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/>
               <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
             </svg>
-            <input id="search" type="search" placeholder="Search" aria-label="Search">
+            <input id="search" type="search" data-i18n-placeholder="search" data-i18n-aria="search" placeholder="Search" aria-label="Search">
           </div>
           <span class="sky" aria-hidden="true">
             <svg class="sun" viewBox="0 0 18 18" fill="none">
@@ -553,47 +583,54 @@
             </svg>
           </span>
           <button id="account-button" type="button" hidden>Sign in</button>
-          <label class="switch">
-            <input id="appearance" type="checkbox" role="switch" aria-label="Dark mode">
-            <span class="switch-track"></span>
-          </label>
         </div>
       </header>
       <div class="panes">
         <div id="pane-today" class="pane">
           <div class="document">
-            <h2>Add a lesson</h2>
-            <p class="hint">Each Arabizi spelling stays with its English meaning.</p>
-            <div class="field">
-              <label for="learned-on">Lesson date</label>
+            <h2 data-i18n="addLesson">Add a lesson</h2>
+            <p class="hint" data-i18n="lessonHint">Each Arabizi spelling stays with its English meaning.</p>
+            <div class="lesson-day">
+              <label for="learned-on" data-i18n="lessonDate">Date</label>
               <input id="learned-on" type="date">
             </div>
             <div class="field">
-              <label for="paste">Words</label>
-              <textarea id="paste" placeholder="practice - tadreeb&#10;to train - etdarrab&#10;8ararat = decisions"></textarea>
+              <label for="paste" data-i18n="wordsLabel">Words</label>
+              <textarea id="paste" data-i18n-placeholder="pastePlaceholder" placeholder="practice - tadreeb&#10;to train - etdarrab&#10;8ararat = decisions"></textarea>
             </div>
             <div class="row">
-              <button id="preview" class="primary" type="button">Preview</button>
-              <button id="save" class="secondary" type="button">Save lesson</button>
+              <button id="preview" class="primary" type="button" data-i18n="preview">Preview</button>
+              <button id="save" class="secondary" type="button" data-i18n="saveLesson">Save lesson</button>
             </div>
             <p id="form-error" class="error"></p>
             <table id="preview-table" hidden>
-              <thead><tr><th>Arabizi</th><th>English</th><th></th></tr></thead>
+              <thead><tr><th data-i18n="colArabizi">Arabizi</th><th data-i18n="colGloss">English</th><th></th></tr></thead>
               <tbody></tbody>
             </table>
             <section id="recent" class="recent" hidden></section>
+            <section class="sheet-import" aria-label="Import CSV">
+              <h2 data-i18n="importCsv">Import a CSV</h2>
+              <p class="hint" data-i18n="importHint">Starting empty? Upload a sheet with Word and Meaning columns. Date Added groups them by lesson day.</p>
+              <div class="file-row">
+                <input id="csv-file" type="file" accept=".csv,text/csv">
+                <button id="pick-csv" class="secondary" type="button" data-i18n="chooseCsv">Choose CSV</button>
+                <button id="import-csv" class="tint" type="button" data-i18n="importWords" disabled>Import words</button>
+              </div>
+              <p id="csv-file-name" class="file-name" data-i18n="noCsvChosen">No file chosen</p>
+              <p id="import-error" class="error"></p>
+            </section>
           </div>
           <aside class="inspector">
-            <p class="kicker">Next lesson</p>
-            <p id="next-lesson" class="lead">Looking up your next Arabic lesson.</p>
+            <p class="kicker" data-i18n="nextLesson">Next lesson</p>
+            <p id="next-lesson" class="lead" data-i18n="lookingUpLesson">Looking up your next Arabic lesson.</p>
             <section id="calendar-setup">
-              <h2>Calendar</h2>
-              <p class="hint">Paste the secret iCal address from Google Calendar.</p>
+              <h2 data-i18n="calendar">Calendar</h2>
+              <p class="hint" data-i18n="calendarHint">Paste the secret iCal address from Google Calendar.</p>
               <div class="field">
-                <label for="calendar-url">iCal link</label>
+                <label for="calendar-url" data-i18n="icalLink">iCal link</label>
                 <input id="calendar-url" type="url" placeholder="https://calendar.google.com/calendar/ical/..." autocomplete="off">
               </div>
-              <div class="row"><button id="save-calendar" class="tint" type="button">Save calendar</button></div>
+              <div class="row"><button id="save-calendar" class="tint" type="button" data-i18n="saveCalendar">Save calendar</button></div>
               <p id="calendar-error" class="error"></p>
             </section>
           </aside>
@@ -601,39 +638,39 @@
 
         <div id="pane-practice" class="pane" hidden>
           <div class="stage">
-            <button id="orb" class="orb" type="button" aria-label="Talk"><i></i><i></i><i></i></button>
-            <p id="voice-state" class="voice-state">Tap to talk</p>
+            <button id="orb" class="orb" type="button" aria-label="Talk" data-i18n-aria="talk"><i></i><i></i><i></i></button>
+            <p id="voice-state" class="voice-state" data-i18n="tapToTalk">Tap to talk</p>
             <p id="voice-line" class="voice-line"></p>
             <p id="voice-gloss" class="voice-gloss"></p>
             <p id="talk-error" class="error"></p>
             <div id="talk-log"></div>
             <div class="scenes" role="group" aria-label="Situation">
-              <button type="button" class="secondary" data-scene="coffee">Coffee</button>
-              <button type="button" class="secondary" data-scene="restaurant">Restaurant</button>
-              <button type="button" class="secondary" data-scene="shop">Shop</button>
-              <button type="button" class="secondary" data-scene="taxi">Taxi</button>
+              <button type="button" class="secondary" data-scene="coffee" data-i18n="sceneCoffee">Coffee</button>
+              <button type="button" class="secondary" data-scene="restaurant" data-i18n="sceneRestaurant">Restaurant</button>
+              <button type="button" class="secondary" data-scene="shop" data-i18n="sceneShop">Shop</button>
+              <button type="button" class="secondary" data-scene="taxi" data-i18n="sceneTaxi">Taxi</button>
             </div>
             <div class="composer">
-              <input id="talk-typed" type="text" placeholder="Or type in Arabizi" autocomplete="off" autocapitalize="off">
+              <input id="talk-typed" type="text" data-i18n-placeholder="typeArabizi" placeholder="Or type in Arabizi" autocomplete="off" autocapitalize="off">
             </div>
           </div>
           <div id="practice-empty" class="empty-state" hidden>
-            <p class="kicker">Library</p>
-            <p>Choose a saved word, then write one sentence that uses it.</p>
+            <p class="kicker" data-i18n="library">Library</p>
+            <p data-i18n="chooseWord">Choose a saved word, then write one sentence that uses it.</p>
           </div>
           <section id="practice" hidden>
             <div>
-              <p class="kicker">Write with</p>
+              <p class="kicker" data-i18n="writeWith">Write with</p>
               <h2 id="practice-title"></h2>
               <p id="practice-gloss"></p>
               <ul id="similar" class="similar"></ul>
             </div>
             <div>
               <div class="field">
-                <label for="sentence">Your sentence</label>
-                <input id="sentence" type="text" placeholder="Arabizi that uses this word" autocomplete="off" autocapitalize="off" spellcheck="false">
+                <label for="sentence" data-i18n="yourSentence">Your sentence</label>
+                <input id="sentence" type="text" data-i18n-placeholder="sentencePlaceholder" placeholder="Arabizi that uses this word" autocomplete="off" autocapitalize="off" spellcheck="false">
               </div>
-              <div class="row"><button id="judge" class="primary" type="button">Check sentence</button></div>
+              <div class="row"><button id="judge" class="primary" type="button" data-i18n="checkSentence">Check sentence</button></div>
               <p id="judgment"></p>
             </div>
           </section>
@@ -644,15 +681,244 @@
           <p id="library-error" class="error"></p>
           <div id="library"></div>
         </div>
+
+        <div id="pane-settings" class="pane" hidden>
+          <div class="document">
+            <section id="account-setup">
+              <h2 data-i18n="account">Account</h2>
+              <p id="account-status" class="hint" data-i18n="accountHint">Sign in to keep your words on your account.</p>
+              <div class="row">
+                <button id="settings-account-button" class="primary" type="button" data-i18n="signIn">Sign in</button>
+              </div>
+            </section>
+            <section id="language-setup">
+              <h2 data-i18n="language">Language</h2>
+              <p class="hint" data-i18n="languageHint">English: speak Arabizi. Japanese: speak Japanese — Sawt answers in Levantine Arabic.</p>
+              <div class="scenes language-picks" role="group" aria-label="Language">
+                <button type="button" class="secondary" data-language="en" aria-pressed="true">English</button>
+                <button type="button" class="secondary" data-language="ja" aria-pressed="false">日本語</button>
+              </div>
+              <p id="language-error" class="error"></p>
+            </section>
+          </div>
+        </div>
       </div>
     </div>
   </div>
   <script>
     const learnedOn = document.querySelector("#learned-on");
-    learnedOn.value = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    learnedOn.value = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
     let currentId = null;
     let clerk = null;
     let authReady = false;
+    let uiLanguage = localStorage.getItem("language") === "ja" ? "ja" : "en";
+    let pendingCsvText = "";
+
+    const I18N = {
+      en: {
+        tabToday: "Today",
+        tabPractice: "Practice",
+        tabWords: "Words",
+        tabSettings: "Settings",
+        addLesson: "Add a lesson",
+        lessonHint: "Each Arabizi spelling stays with its English meaning.",
+        lessonDate: "Date",
+        wordsLabel: "Words",
+        pastePlaceholder: "practice - tadreeb\nto train - etdarrab\n8ararat = decisions",
+        importCsv: "Import a CSV",
+        importHint: "Starting empty? Upload a sheet with Word and Meaning columns. Date Added groups them by lesson day.",
+        chooseCsv: "Choose CSV",
+        importWords: "Import words",
+        noCsvChosen: "No file chosen",
+        importDone: (days, items) =>
+          items === 1
+            ? "Imported 1 word."
+            : "Imported " + items + " words across " + days + " lesson day" + (days === 1 ? "." : "s."),
+        emptyLibrary: "No lessons saved yet.",
+        emptyLibraryHint: "Paste a lesson on Today, or import a CSV there.",
+        preview: "Preview",
+        saveLesson: "Save lesson",
+        colArabizi: "Arabizi",
+        colGloss: "English",
+        nextLesson: "Next lesson",
+        lookingUpLesson: "Looking up your next Arabic lesson.",
+        account: "Account",
+        accountHint: "Sign in to keep your words on your account.",
+        accountLocal: "This local notebook does not need a sign-in.",
+        signedIn: "Signed in",
+        signIn: "Sign in",
+        manageAccount: "Manage account",
+        language: "Language",
+        languageHint: "English: speak Arabizi. Japanese: speak Japanese — Sawt answers in Levantine Arabic.",
+        calendar: "Calendar",
+        calendarHint: "Paste the secret iCal address from Google Calendar.",
+        icalLink: "iCal link",
+        saveCalendar: "Save calendar",
+        tapToTalk: "Tap to talk",
+        talk: "Talk",
+        listening: "Listening",
+        speaking: "Speaking",
+        sceneCoffee: "Coffee",
+        sceneRestaurant: "Restaurant",
+        sceneShop: "Shop",
+        sceneTaxi: "Taxi",
+        typeArabizi: "Or type in Arabizi",
+        library: "Library",
+        chooseWord: "Choose a saved word, then write one sentence that uses it.",
+        writeWith: "Write with",
+        yourSentence: "Your sentence",
+        sentencePlaceholder: "Arabizi that uses this word",
+        checkSentence: "Check sentence",
+        search: "Search",
+        connectCalendar: "Connect Google Calendar to see your next Arabic lesson.",
+        noLesson: "No upcoming Preply lesson on that calendar.",
+        calendarReadError: "Could not read the calendar.",
+        wordCount: (n) => (n === 1 ? "1 word" : n + " words"),
+        edit: "Edit",
+        save: "Save",
+        cancel: "Cancel",
+        usesTarget: "uses the target",
+        missesTarget: "does not use the target",
+        fitsMeaning: "fits the meaning",
+        missesMeaning: "does not fit the meaning",
+        tryPrefix: "Try: ",
+        you: "You",
+        sawt: "Sawt",
+        noSpeech: "This browser has no speech recognition. Type a line instead.",
+        micDenied: "Allow the microphone, then tap the circle.",
+        speakFailed: "Could not play Arabic speech.",
+        speakMissing: "No Arabic script to speak. Type a line, or try again.",
+        glossAria: "English",
+        arabiziAria: "Arabizi",
+        startScene: "Start. You speak first, in the place, one short line.",
+      },
+      ja: {
+        tabToday: "今日",
+        tabPractice: "練習",
+        tabWords: "単語",
+        tabSettings: "設定",
+        addLesson: "レッスンを追加",
+        lessonHint: "ローマ字の綴りを日本語の意味と一緒に保存します。話すアラビア語はそのままです。",
+        lessonDate: "日付",
+        wordsLabel: "単語",
+        pastePlaceholder: "練習 - tadreeb\n訓練する - etdarrab\nqararat = 決定",
+        importCsv: "CSVを取り込む",
+        importHint: "単語がまだないときは、Word と Meaning 列のあるCSVをアップロードできます。Date Added があればレッスン日ごとに分かれます。",
+        chooseCsv: "CSVを選ぶ",
+        importWords: "単語を取り込む",
+        noCsvChosen: "ファイル未選択",
+        importDone: (days, items) =>
+          items + "語を" + days + "日分のレッスンとして取り込みました。",
+        emptyLibrary: "まだレッスンがありません。",
+        emptyLibraryHint: "「今日」で貼り付けるか、CSVを取り込んでください。",
+        preview: "プレビュー",
+        saveLesson: "レッスンを保存",
+        colArabizi: "ローマ字",
+        colGloss: "日本語",
+        nextLesson: "次のレッスン",
+        lookingUpLesson: "次のアラビア語レッスンを確認しています。",
+        account: "アカウント",
+        accountHint: "サインインすると、単語を自分のアカウントに保存できます。",
+        accountLocal: "このローカルノートはサインイン不要です。",
+        signedIn: "サインイン済み",
+        signIn: "サインイン",
+        manageAccount: "アカウントを管理",
+        language: "言語",
+        languageHint: "日本語で話してください。Sawtはレバント・アラビア語で答え、画面にローマ字も出します。",
+        calendar: "カレンダー",
+        calendarHint: "Googleカレンダーの非公開iCalアドレスを貼ってください。",
+        icalLink: "iCalリンク",
+        saveCalendar: "カレンダーを保存",
+        tapToTalk: "タップして話す",
+        talk: "話す",
+        listening: "聞いています",
+        speaking: "話しています",
+        sceneCoffee: "カフェ",
+        sceneRestaurant: "レストラン",
+        sceneShop: "お店",
+        sceneTaxi: "タクシー",
+        typeArabizi: "日本語またはローマ字で入力",
+        library: "ライブラリ",
+        chooseWord: "保存した単語を選び、それを使う一文を書いてください。",
+        writeWith: "これで書く",
+        yourSentence: "あなたの文",
+        sentencePlaceholder: "この単語を使うローマ字",
+        checkSentence: "文をチェック",
+        search: "検索",
+        connectCalendar: "Googleカレンダーを接続すると次のアラビア語レッスンが表示されます。",
+        noLesson: "このカレンダーに今後のPreplyレッスンはありません。",
+        calendarReadError: "カレンダーを読めませんでした。",
+        wordCount: (n) => n + "語",
+        edit: "編集",
+        save: "保存",
+        cancel: "キャンセル",
+        usesTarget: "目標語を使っている",
+        missesTarget: "目標語を使っていない",
+        fitsMeaning: "意味に合っている",
+        missesMeaning: "意味に合っていない",
+        tryPrefix: "アラビア語では: ",
+        you: "あなた",
+        sawt: "Sawt",
+        noSpeech: "音声認識が使えません。下の枠に日本語かローマ字で入力してください。",
+        micDenied: "マイクを許可してから、もう一度円をタップしてください。",
+        speakFailed: "アラビア語の音声を再生できませんでした。",
+        speakMissing: "読み上げ用のアラビア文字がありません。もう一度話するか入力してください。",
+        glossAria: "日本語",
+        arabiziAria: "ローマ字",
+        startScene: "Start. You speak first, in the place, one short line.",
+      },
+    };
+
+    function t(key) {
+      const table = I18N[uiLanguage] || I18N.en;
+      return table[key] ?? I18N.en[key] ?? key;
+    }
+
+    function applyLanguage(language) {
+      uiLanguage = language === "ja" ? "ja" : "en";
+      localStorage.setItem("language", uiLanguage);
+      document.documentElement.lang = uiLanguage === "ja" ? "ja" : "en";
+      document.querySelectorAll("[data-i18n]").forEach((node) => {
+        const value = t(node.dataset.i18n);
+        if (typeof value === "string") node.textContent = value;
+      });
+      document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+        const value = t(node.dataset.i18nPlaceholder);
+        if (typeof value === "string") node.placeholder = value;
+      });
+      document.querySelectorAll("[data-i18n-aria]").forEach((node) => {
+        const value = t(node.dataset.i18nAria);
+        if (typeof value === "string") node.setAttribute("aria-label", value);
+      });
+      document.querySelectorAll("[data-language]").forEach((button) => {
+        button.setAttribute("aria-pressed", button.dataset.language === uiLanguage ? "true" : "false");
+      });
+      const activeTab = document.querySelector(".tab.active")?.dataset.tab || "today";
+      const titleKeys = {
+        today: "tabToday",
+        practice: "tabPractice",
+        words: "tabWords",
+        settings: "tabSettings",
+      };
+      document.querySelector("#toolbar-title").textContent = t(titleKeys[activeTab] || "tabToday");
+      if (voicePhase === "idle") setTalkLabel("Talk");
+      else if (voicePhase === "listening") setTalkLabel("Listening");
+      else if (voicePhase === "speaking") setTalkLabel("Speaking");
+      const typed = document.querySelector("#talk-typed");
+      if (typed) typed.lang = uiLanguage === "ja" ? "ja" : "en";
+      const csvName = document.querySelector("#csv-file-name");
+      if (csvName && !pendingCsvText) csvName.textContent = t("noCsvChosen");
+      paintAccount();
+    }
+
+    function isJapaneseText(text) {
+      return /[\u3040-\u30ff\u3400-\u9fff]/.test(text || "");
+    }
 
     async function authHeaders(extra = {}) {
       const headers = { ...extra };
@@ -674,13 +940,23 @@
     }
 
     function paintAccount() {
-      const button = document.querySelector("#account-button");
+      const button = document.querySelector("#settings-account-button");
+      const status = document.querySelector("#account-status");
+      if (!button || !status) return;
       if (!clerk) {
         button.hidden = true;
+        status.textContent = t("accountLocal");
         return;
       }
       button.hidden = false;
-      button.textContent = clerk.user ? "Account" : "Sign in";
+      if (clerk.user) {
+        button.textContent = t("manageAccount");
+        const email = clerk.user.primaryEmailAddress?.emailAddress;
+        status.textContent = email || clerk.user.fullName || t("signedIn");
+      } else {
+        button.textContent = t("signIn");
+        status.textContent = t("accountHint");
+      }
     }
 
     function clerkFrontendHost(publishableKey) {
@@ -741,6 +1017,7 @@
         showAuthGate(!user);
         paintAccount();
         if (user) {
+          loadLanguage();
           loadNextLesson();
           loadLibrary();
           loadRecent();
@@ -751,17 +1028,22 @@
     document.querySelector("#sign-in").onclick = () => {
       if (clerk) clerk.openSignIn({ forceRedirectUrl: "/" });
     };
-    document.querySelector("#account-button").onclick = () => {
+    document.querySelector("#settings-account-button").onclick = () => {
       if (!clerk) return;
       if (clerk.user) clerk.openUserProfile();
       else clerk.openSignIn({ forceRedirectUrl: "/" });
     };
 
     function showTab(name) {
-      const titles = { today: "Today", practice: "Practice", words: "Words" };
-      document.querySelector("#toolbar-title").textContent = titles[name];
+      const titleKeys = {
+        today: "tabToday",
+        practice: "tabPractice",
+        words: "tabWords",
+        settings: "tabSettings",
+      };
+      document.querySelector("#toolbar-title").textContent = t(titleKeys[name] || "tabToday");
       document.querySelector(".search-wrap").hidden = name !== "words";
-      for (const tab of ["today", "practice", "words"]) {
+      for (const tab of ["today", "practice", "words", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -771,13 +1053,45 @@
       }
     }
 
+    async function loadLanguage() {
+      try {
+        const response = await apiFetch("/api/settings");
+        if (!response.ok) {
+          applyLanguage(uiLanguage);
+          return;
+        }
+        const payload = await response.json();
+        applyLanguage(payload.language === "ja" ? "ja" : "en");
+      } catch (err) {
+        applyLanguage(uiLanguage);
+      }
+    }
+
+    document.querySelectorAll("[data-language]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const language = button.dataset.language === "ja" ? "ja" : "en";
+        const error = document.querySelector("#language-error");
+        error.textContent = "";
+        applyLanguage(language);
+        try {
+          await post("/api/settings", { language });
+        } catch (err) {
+          error.textContent = err.message;
+        }
+      });
+    });
+
     document.querySelectorAll(".tab").forEach((button) => {
       button.addEventListener("click", () => showTab(button.dataset.tab));
     });
 
+    function localeTag() {
+      return uiLanguage === "ja" ? "ja-JP" : undefined;
+    }
+
     function formatLesson(iso) {
       const when = new Date(iso);
-      return when.toLocaleString(undefined, {
+      return when.toLocaleString(localeTag(), {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -788,7 +1102,7 @@
 
     function formatDay(iso) {
       const [year, month, day] = iso.split("-").map(Number);
-      return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+      return new Date(year, month - 1, day).toLocaleDateString(localeTag(), {
         weekday: "long",
         month: "long",
         day: "numeric",
@@ -806,16 +1120,16 @@
       const response = await apiFetch("/api/next-lesson");
       const payload = await response.json();
       if (!response.ok) {
-        paintLesson(payload.error || "Could not read the calendar.");
+        paintLesson(payload.error || t("calendarReadError"));
         return;
       }
       setup.hidden = payload.connected;
       if (!payload.connected) {
-        paintLesson("Connect Google Calendar to see your next Arabic lesson.");
+        paintLesson(t("connectCalendar"));
         return;
       }
       if (!payload.lesson) {
-        paintLesson("No upcoming Preply lesson on that calendar.");
+        paintLesson(t("noLesson"));
         return;
       }
       const banner = document.querySelector("#next-lesson");
@@ -908,6 +1222,60 @@
       }
     };
 
+    const csvFileInput = document.querySelector("#csv-file");
+    const csvImportButton = document.querySelector("#import-csv");
+    const csvFileName = document.querySelector("#csv-file-name");
+
+    function clearCsvPick() {
+      pendingCsvText = "";
+      csvFileInput.value = "";
+      csvImportButton.disabled = true;
+      csvFileName.textContent = t("noCsvChosen");
+    }
+
+    document.querySelector("#pick-csv").onclick = () => csvFileInput.click();
+
+    csvFileInput.onchange = async () => {
+      const error = document.querySelector("#import-error");
+      error.className = "error";
+      error.textContent = "";
+      const file = csvFileInput.files && csvFileInput.files[0];
+      if (!file) {
+        clearCsvPick();
+        return;
+      }
+      pendingCsvText = await file.text();
+      csvFileName.textContent = file.name;
+      csvImportButton.disabled = !pendingCsvText.trim();
+    };
+
+    csvImportButton.onclick = async () => {
+      const error = document.querySelector("#import-error");
+      error.className = "error";
+      error.textContent = "";
+      if (!pendingCsvText.trim()) {
+        error.textContent = t("noCsvChosen");
+        return;
+      }
+      csvImportButton.disabled = true;
+      try {
+        const saved = await post("/api/import-csv", {
+          csv: pendingCsvText,
+          learned_on: learnedOn.value,
+        });
+        clearCsvPick();
+        error.className = "error note";
+        error.textContent = t("importDone")(saved.days, saved.items);
+        await loadLibrary();
+        await loadRecent();
+        showTab("words");
+      } catch (err) {
+        error.className = "error";
+        error.textContent = err.message;
+        csvImportButton.disabled = !pendingCsvText.trim();
+      }
+    };
+
     async function loadLibrary() {
       document.querySelector("#library-error").textContent = "";
       const query = document.querySelector("#search").value.trim();
@@ -925,11 +1293,17 @@
         count.textContent = "";
         const empty = document.createElement("p");
         empty.className = "empty";
-        empty.textContent = query ? "No words match that search." : "No lessons saved yet.";
+        empty.textContent = query ? "No words match that search." : t("emptyLibrary");
         library.append(empty);
+        if (!query) {
+          const hint = document.createElement("p");
+          hint.className = "empty empty-import";
+          hint.textContent = t("emptyLibraryHint");
+          library.append(hint);
+        }
         return;
       }
-      count.textContent = items.length === 1 ? "1 saved" : items.length + " saved";
+      count.textContent = t("wordCount")(items.length);
       for (const [date, rows] of groups) {
         const heading = document.createElement("h3");
         heading.textContent = formatDay(date);
@@ -963,7 +1337,7 @@
       const edit = document.createElement("button");
       edit.className = "text";
       edit.type = "button";
-      edit.textContent = "Edit";
+      edit.textContent = t("edit");
       edit.onclick = () => beginEdit(row, item);
       editCell.append(edit);
       row.append(cell, gloss, kind, editCell);
@@ -976,11 +1350,11 @@
       const spelling = document.createElement("input");
       spelling.type = "text";
       spelling.value = item.spelling;
-      spelling.setAttribute("aria-label", "Arabizi");
+      spelling.setAttribute("aria-label", t("arabiziAria"));
       const gloss = document.createElement("input");
       gloss.type = "text";
       gloss.value = item.gloss;
-      gloss.setAttribute("aria-label", "English");
+      gloss.setAttribute("aria-label", t("glossAria"));
       const spellingCell = document.createElement("td");
       spellingCell.append(spelling);
       const glossCell = document.createElement("td");
@@ -991,11 +1365,11 @@
       const save = document.createElement("button");
       save.className = "primary";
       save.type = "button";
-      save.textContent = "Save";
+      save.textContent = t("save");
       const cancel = document.createElement("button");
       cancel.className = "text";
       cancel.type = "button";
-      cancel.textContent = "Cancel";
+      cancel.textContent = t("cancel");
       save.onclick = () => saveEdit(item, spelling.value, gloss.value);
       cancel.onclick = () => loadLibrary();
       const onKey = (event) => {
@@ -1114,9 +1488,9 @@
           item_id: currentId,
           sentence: document.querySelector("#sentence").value,
         });
-        const used = result.uses_target ? "Uses the target" : "Does not use the target";
-        const fit = result.fits_meaning ? "fits the meaning" : "does not fit the meaning";
-        judgment.textContent = `${used}, and ${fit}. ${result.comment}`;
+        const used = result.uses_target ? t("usesTarget") : t("missesTarget");
+        const fit = result.fits_meaning ? t("fitsMeaning") : t("missesMeaning");
+        judgment.textContent = `${used}; ${fit}. ${result.comment}`;
         judgment.className = result.uses_target && result.fits_meaning ? "ok" : "warn";
       } catch (err) {
         judgment.textContent = err.message;
@@ -1128,6 +1502,7 @@
     let scene = "";
     let listening = null;
     let conversing = false;
+    let voicePhase = "idle";
     let pending = "";
     let draft = "";
     let pauseTimer = null;
@@ -1142,7 +1517,9 @@
     }
 
     async function speakArabic(text) {
-      if (!text) return;
+      if (!text || !/[\u0600-\u06FF]/.test(text)) {
+        throw new Error(t("speakMissing"));
+      }
       const response = await apiFetch("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1150,12 +1527,17 @@
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "could not speak");
+        throw new Error(payload.error || t("speakFailed"));
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       player.src = url;
-      await player.play();
+      try {
+        await player.play();
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        throw new Error(t("speakFailed"));
+      }
       await new Promise((resolve) => {
         player.onended = () => {
           URL.revokeObjectURL(url);
@@ -1169,7 +1551,15 @@
     }
 
     function setTalkLabel(text) {
-      document.querySelector("#voice-state").textContent = text === "Talk" ? "Tap to talk" : text;
+      const key =
+        text === "Talk" || text === "tapToTalk" || text === "idle" ? "tapToTalk"
+        : text === "Listening" || text === "listening" ? "listening"
+        : text === "Speaking" || text === "speaking" ? "speaking"
+        : null;
+      if (key === "listening") voicePhase = "listening";
+      else if (key === "speaking") voicePhase = "speaking";
+      else if (key === "tapToTalk") voicePhase = "idle";
+      document.querySelector("#voice-state").textContent = key ? t(key) : text;
     }
 
     function markScene() {
@@ -1186,7 +1576,7 @@
     function openVoice() {
       unlockAudio();
       showVoiceLine("", "");
-      document.querySelector("#voice-state").textContent = "Listening";
+      setTalkLabel("Listening");
       startLevel();
       markScene();
       if (scene && talkLog.length === 0) {
@@ -1205,9 +1595,9 @@
       const error = document.querySelector("#talk-error");
       error.textContent = "";
       try {
-        const reply = await post("/api/talk", { scene, start: false, turns: [{ role: "user", text: "Start. You speak first, in the place, one short line." }] });
+        const reply = await post("/api/talk", { scene, start: false, turns: [{ role: "user", text: t("startScene") }] });
         if (!conversing) return;
-        appendTurn("Sawt", reply.arabizi, reply.english);
+        appendTurn(t("sawt"), reply.arabizi, reply.english);
         talkLog.push({ role: "assistant", text: reply.arabizi });
         showVoiceLine(reply.arabizi, reply.english);
         await speakArabic(reply.arabic);
@@ -1257,7 +1647,7 @@
       const tick = (now) => {
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        const speaking = document.querySelector("#voice-state").textContent === "Speaking";
+        const speaking = voicePhase === "speaking";
         const raw = speaking ? measure(outAnalyser) : measure(micAnalyser);
         const target = 0.92 + raw * 0.55;
         velocity += (target - spring) * 80 * dt;
@@ -1352,10 +1742,20 @@
       try {
         const reply = await post("/api/talk", { turns: talkLog.slice(-6), scene });
         if (!conversing) return;
-        talkLog[talkLog.length - 1].text = reply.you_arabizi || said;
-        appendTurn("You", reply.you_arabizi, reply.you_english);
-        const note = [reply.correction, reply.better && ("Try: " + reply.better)].filter(Boolean).join(" ");
-        appendTurn("Sawt", reply.arabizi, reply.english, note);
+        const spokeJapanese = uiLanguage === "ja" && isJapaneseText(said);
+        // Keep Japanese in the history so the next turns still understand them.
+        talkLog[talkLog.length - 1].text = spokeJapanese ? said : (reply.you_arabizi || said);
+        if (spokeJapanese) {
+          // Show what they said in Japanese, with Levantine romaji underneath.
+          appendTurn(t("you"), said, reply.you_arabizi || reply.you_english);
+        } else {
+          appendTurn(t("you"), reply.you_arabizi || said, reply.you_english);
+        }
+        const note = [
+          reply.correction,
+          reply.better && (!spokeJapanese || reply.better !== reply.you_arabizi) && (t("tryPrefix") + reply.better),
+        ].filter(Boolean).join(" ");
+        appendTurn(t("sawt"), reply.arabizi, reply.english, note);
         showVoiceLine(reply.arabizi, reply.english);
         talkLog.push({ role: "assistant", text: reply.arabizi });
         await speakArabic(reply.arabic);
@@ -1377,16 +1777,18 @@
       const error = document.querySelector("#talk-error");
       if (!Speech) {
         conversing = false;
-        error.textContent = "This browser has no speech recognition. Type a line instead.";
+        error.textContent = t("noSpeech");
         document.querySelector("#talk-typed").focus();
         setTalkLabel("Talk");
         return;
       }
       if (listening) return;
       const recognition = new Speech();
-      recognition.lang = "ar";
+      // Japanese accounts speak Japanese; English accounts speak Arabic / Arabizi.
+      recognition.lang = uiLanguage === "ja" ? "ja-JP" : "ar-SA";
       recognition.continuous = true;
       recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
       const waitForPause = () => {
         clearTimeout(pauseTimer);
         pauseTimer = setTimeout(() => {
@@ -1415,8 +1817,17 @@
       recognition.onerror = (event) => {
         if (event.error === "not-allowed") {
           stopConversation();
-          error.textContent = "Allow the microphone, then tap the circle.";
+          error.textContent = t("micDenied");
+          return;
         }
+        if (event.error === "audio-capture" || event.error === "service-not-allowed") {
+          error.textContent = t("noSpeech");
+          document.querySelector("#talk-typed").focus();
+          return;
+        }
+        if (event.error === "no-speech" || event.error === "aborted") return;
+        error.textContent = t("noSpeech");
+        document.querySelector("#talk-typed").focus();
       };
       recognition.onend = () => {
         if (listening !== recognition) return;
@@ -1426,7 +1837,14 @@
       listening = recognition;
       setTalkLabel("Listening");
       error.textContent = "";
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (err) {
+        listening = null;
+        error.textContent = t("noSpeech");
+        document.querySelector("#talk-typed").focus();
+        setTalkLabel("Talk");
+      }
     }
 
     document.querySelector("#orb").onclick = () => {
@@ -1461,29 +1879,18 @@
       sendTalk(line);
     });
 
-    const appearance = document.querySelector("#appearance");
-    const savedAppearance = localStorage.getItem("appearance");
+    localStorage.removeItem("appearance");
 
-    function applyAppearance(dark) {
-      document.documentElement.dataset.appearance = dark ? "dark" : "light";
-      appearance.checked = dark;
-      appearance.setAttribute("aria-checked", dark ? "true" : "false");
-      document.querySelector('meta[name="theme-color"]').content = dark ? "#000000" : "#f2f2f7";
-    }
-
-    applyAppearance(savedAppearance ? savedAppearance === "dark" : matchMedia("(prefers-color-scheme: dark)").matches);
-    appearance.addEventListener("change", () => {
-      localStorage.setItem("appearance", appearance.checked ? "dark" : "light");
-      applyAppearance(appearance.checked);
-    });
-
+    applyLanguage(uiLanguage);
     runMotion();
     document.querySelector("#search").addEventListener("input", () => loadLibrary());
     bootAuth().then(() => {
       if (clerk && !clerk.user) return;
-      loadNextLesson();
-      loadLibrary();
-      loadRecent();
+      return loadLanguage().then(() => {
+        loadNextLesson();
+        loadLibrary();
+        loadRecent();
+      });
     }).catch((err) => {
       document.querySelector("#auth-gate").hidden = false;
       document.querySelector(".window").hidden = true;

@@ -35,6 +35,7 @@ class PromptTests(unittest.TestCase):
                     "Judge whether their sentence uses the target in a way that fits the meaning.",
                     "Use the other lesson items and grammar notes only as context.",
                     "Do not invent a sentence for them.",
+                    "Write the comment in English. Do not rewrite the learner's Arabizi.",
                     "",
                     "Target (word): ijazeh",
                     "Meaning: holiday",
@@ -52,6 +53,17 @@ class PromptTests(unittest.TestCase):
                 ]
             ),
         )
+
+    def test_japanese_account_uses_romaji_in_the_prompt(self) -> None:
+        card = self.session.cards[0]
+        prompt = build_prompt(self.session, card, "raht al ijazeh", language="ja")
+        self.assertIn("You are a Levantine Arabic tutor using romaji.", prompt)
+        self.assertIn(
+            "Write the comment in Japanese. Do not rewrite the learner's romaji.",
+            prompt,
+        )
+        self.assertIn("Target (word): ijazeh", prompt)
+        self.assertIn("raht al ijazeh", prompt)
 
     def test_card_from_outside_the_session_is_rejected(self) -> None:
         stranger = PracticeCard(1, "word", "bas", "but")

@@ -18,10 +18,18 @@ from lexicon.judge import (
     read_api_key,
 )
 from lexicon.db import LOCAL_USER, insert_id
-from lexicon.load import normalize_meaning, normalize_word
+from lexicon.load import normalize_meaning, normalize_word, parse_vocabulary_csv
 from lexicon.lessons import parse_date_added
 from lexicon.practice import PracticeCard, PracticeSession, _oriented
+from lexicon.prefs import (
+    DEFAULT_LANGUAGE,
+    get_language,
+    metalanguage_label,
+    writing_system,
+    writing_system_label,
+)
 from lexicon.prompt import build_prompt
+from lexicon.speak import arabic_for_speech
 
 EMBED_MODEL = "openai/text-embedding-3-small"
 EMBED_URL = "https://openrouter.ai/api/v1/embeddings"
@@ -142,10 +150,11 @@ def save_lesson(
     return {"id": lesson_id, "learned_on": learned_on, "items": items, "skipped": skipped}
 
 
-def import_sheet(conn: sqlite3.Connection, embed=None) -> dict:
+def import_sheet(conn, embed=None, user_id: str = LOCAL_USER) -> dict:
     """Copy practice words from the CSV table into dated lessons.
 
     Exact re-imports are skipped. A second run does not add the same day again.
+    Local SQLite only: the hosted Postgres store has no entries table.
     """
     if embed is None:
         embed = embed_glosses
@@ -184,18 +193,75 @@ def import_sheet(conn: sqlite3.Connection, embed=None) -> dict:
         kind, spelling, gloss = oriented
         day = parse_date_added(row["date_added"]).date().isoformat()
         by_day.setdefault(day, []).append((spelling, gloss, kind))
+    return _commit_imported_days(conn, by_day, embed, user_id)
 
+
+def import_csv(
+    conn,
+    csv_text: str,
+    embed=None,
+    user_id: str = LOCAL_USER,
+    default_day: str | None = None,
+) -> dict:
+    """Turn an uploaded vocabulary CSV into dated notebook lessons.
+
+    Works without the local entries table, so a new account on Vercel can import
+    a sheet the same way. Exact spelling+meaning pairs already saved are skipped.
+    Grammar notes and blank rows are ignored. Reversed Word/Meaning columns are
+    swapped the same way as the older sheet import.
+    """
+    if embed is None:
+        embed = embed_glosses
+    fallback = (default_day or datetime.now(timezone.utc).date().isoformat()).strip()
+    if len(fallback) != 10:
+        raise ValueError("default day must be YYYY-MM-DD")
+    known = _known_pairs(conn, user_id)
+    seen: set[tuple[str, str]] = set()
+    by_day: dict[str, list[tuple[str, str, str]]] = {}
+    for row in parse_vocabulary_csv(csv_text):
+        oriented = _oriented(row)
+        if oriented is None or oriented[0] not in ("word", "phrase"):
+            continue
+        kind, spelling, gloss = oriented
+        key = (normalize_word(spelling), normalize_meaning(gloss))
+        if not key[0] or key in known or key in seen:
+            continue
+        seen.add(key)
+        day = _csv_day(row.get("date_added") or "", fallback)
+        by_day.setdefault(day, []).append((spelling, gloss, kind))
+    if not by_day:
+        raise ValueError("no new words found in that CSV")
+    added = 0
+    for day, triples in by_day.items():
+        added += _store_imported_day(conn, day, triples, embed, user_id)
+    return {"days": len(by_day), "items": added}
+
+
+def _csv_day(value: str, fallback: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return fallback
+    try:
+        return parse_date_added(text).date().isoformat()
+    except ValueError:
+        pass
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    raise ValueError(f"unrecognized date: {text!r}")
+
+
+def _commit_imported_days(conn, by_day, embed, user_id: str) -> dict:
     added = 0
     days = 0
     for day, triples in by_day.items():
         exists = conn.execute(
             "SELECT id FROM lessons WHERE user_id = ? AND learned_on = ? AND raw_text = ?",
-            (LOCAL_USER, day, _IMPORT_MARK),
+            (user_id, day, _IMPORT_MARK),
         ).fetchone()
         if exists:
             continue
         days += 1
-        added += _store_imported_day(conn, day, triples, embed, LOCAL_USER)
+        added += _store_imported_day(conn, day, triples, embed, user_id)
     return {"days": days, "items": added}
 
 
@@ -434,6 +500,7 @@ def judge_saved_item(
     api_key: str,
     opener=urllib.request.urlopen,
     user_id: str = LOCAL_USER,
+    language: str | None = None,
 ) -> dict:
     """Judge a sentence for one saved item and keep the reply on that item."""
     row = conn.execute(
@@ -466,8 +533,14 @@ def judge_saved_item(
         card = PracticeCard(other["id"], other["kind"], other["spelling"], other["gloss"])
         if card not in cards:
             cards.append(card)
+    metalanguage = language or get_language(conn, user_id)
     uses_target, fits_meaning, comment = call_model(
-        build_prompt(PracticeSession(tuple(cards), ()), target, text),
+        build_prompt(
+            PracticeSession(tuple(cards), ()),
+            target,
+            text,
+            language=metalanguage,
+        ),
         api_key,
         opener,
     )
@@ -536,30 +609,58 @@ _TALK_SCHEMA = {
 }
 _TALK_WORDS = 180
 _SCENES = {
-    "coffee": (
-        "You are the person at the counter of a coffee shop. The learner is ordering.\n"
-        "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
-        "Use these spellings: ahwe, baddi, 7elo, bala sukkar, kbeer, zgheer, 8addeesh.\n"
-        "Ask only one of those in a turn, the way a real counter does. If they miss it or say it awkwardly, put the useful line in better.\n"
-    ),
-    "restaurant": (
-        "You are the server in a restaurant. The learner is ordering food.\n"
-        "Stay in that scene. Help them ask for a dish, without spice, extra, and the bill.\n"
-        "Use these spellings: baddi, bala 7ar, extra, el 7seb.\n"
-        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
-    ),
-    "shop": (
-        "You are the shopkeeper. The learner wants to buy something.\n"
-        "Stay in that scene. Help them point to an item, ask the price, and ask for a cheaper one.\n"
-        "Use these spellings: hayda, 8addeesh, ar5as.\n"
-        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
-    ),
-    "taxi": (
-        "You are the taxi driver. The learner is a passenger.\n"
-        "Stay in that scene. Help them name the destination, ask the price, and say stop here.\n"
-        "Use these spellings: 3a, 8addeesh, wa22ef hon.\n"
-        "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
-    ),
+    "arabizi": {
+        "coffee": (
+            "You are the person at the counter of a coffee shop. The learner is ordering.\n"
+            "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
+            "Use these spellings: ahwe, baddi, 7elo, bala sukkar, kbeer, zgheer, 8addeesh.\n"
+            "Ask only one of those in a turn, the way a real counter does. If they miss it or say it awkwardly, put the useful line in better.\n"
+        ),
+        "restaurant": (
+            "You are the server in a restaurant. The learner is ordering food.\n"
+            "Stay in that scene. Help them ask for a dish, without spice, extra, and the bill.\n"
+            "Use these spellings: baddi, bala 7ar, extra, el 7seb.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+        "shop": (
+            "You are the shopkeeper. The learner wants to buy something.\n"
+            "Stay in that scene. Help them point to an item, ask the price, and ask for a cheaper one.\n"
+            "Use these spellings: hayda, 8addeesh, ar5as.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+        "taxi": (
+            "You are the taxi driver. The learner is a passenger.\n"
+            "Stay in that scene. Help them name the destination, ask the price, and say stop here.\n"
+            "Use these spellings: 3a, 8addeesh, wa22ef hon.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+    },
+    "romaji": {
+        "coffee": (
+            "You are the person at the counter of a coffee shop. The learner is ordering.\n"
+            "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
+            "Use these romaji spellings: ahwe, baddi, helo, bala sukkar, kbeer, zgheer, qaddeesh.\n"
+            "Ask only one of those in a turn, the way a real counter does. If they miss it or say it awkwardly, put the useful line in better.\n"
+        ),
+        "restaurant": (
+            "You are the server in a restaurant. The learner is ordering food.\n"
+            "Stay in that scene. Help them ask for a dish, without spice, extra, and the bill.\n"
+            "Use these romaji spellings: baddi, bala har, extra, el hseb.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+        "shop": (
+            "You are the shopkeeper. The learner wants to buy something.\n"
+            "Stay in that scene. Help them point to an item, ask the price, and ask for a cheaper one.\n"
+            "Use these romaji spellings: hayda, qaddeesh, arkhas.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+        "taxi": (
+            "You are the taxi driver. The learner is a passenger.\n"
+            "Stay in that scene. Help them name the destination, ask the price, and say stop here.\n"
+            "Use these romaji spellings: 'a, qaddeesh, wa''ef hon.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
+        ),
+    },
 }
 
 
@@ -571,14 +672,21 @@ def talk(
     pace=None,
     scene: str = "",
     user_id: str = LOCAL_USER,
+    language: str | None = None,
 ) -> dict:
     """One short Levantine reply that prefers words already saved.
 
     The newest saved words are the ones the model sees, so a turn stays small.
-    Arabic script is for speech. Arabizi and English are for the page.
+    Arabic script is for Sawt's speech. English accounts speak/type Arabizi;
+    Japanese accounts may speak Japanese, and see romaji on the page.
     """
     history = _talk_turns(turns)
     drop_exact_duplicates(conn, user_id=user_id)
+    metalanguage = language or get_language(conn, user_id)
+    if metalanguage not in ("en", "ja"):
+        metalanguage = DEFAULT_LANGUAGE
+    system = writing_system(metalanguage)
+    latin = writing_system_label(metalanguage)
     seen: set[str] = set()
     chosen = []
     for item in list_items(conn, user_id=user_id):
@@ -593,23 +701,22 @@ def talk(
         raise ValueError("save a few words first")
     vocab = "\n".join(f"{item['spelling']} = {item['gloss']}" for item in chosen)
     spoken = "\n".join(f"{turn['role']}: {turn['text']}" for turn in history)
+    scenes = _SCENES[system]
+    scene_block = f"\n{scenes[scene]}\n" if scene in scenes else "\n"
     prompt = (
         "You are a Levantine friend on a voice call, not a teacher giving a lesson.\n"
         "Answer in one or two short spoken sentences, the way people actually talk.\n"
         "Prefer the learner's saved words when they fit. Each spelling is listed once.\n"
         "Do not repeat a line you already said in this conversation. Do not quiz them.\n"
-        "Spell Arabizi the way this notebook does, lowercase, and copy a saved word exactly when you use it.\n"
-        "2 is ء or أ, 3 is ع, 3' is غ, 5 is خ, 6 is ط, 7 is ح, 8 is ق, 9 is ص, 9' is ض.\n"
-        "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
-        "you_arabizi is what the learner just said, in that spelling. No Arabic script there.\n"
-        "you_english is a plain translation of that line.\n"
-        "arabic is the Arabic script you would say out loud.\n"
-        "arabizi is that same reply spelled the way the learner writes.\n"
-        "english is a plain one-line gloss of your reply.\n"
-        "If the latest user line begins with Start, you speak first in the scene and leave you_arabizi and you_english empty.\n"
-        "If their Levantine is off, set correction to one kind sentence about what was off,\n"
-        "and better to a fuller way they could say it, in Arabizi. If it was fine, leave both empty.\n"
-        + (f"\n{_SCENES[scene]}\n" if scene in _SCENES else "\n")
+        f"{_talk_spelling_block(system)}"
+        f"{_talk_learner_input_block(metalanguage, latin)}"
+        "arabic is ONLY Arabic Unicode script for text-to-speech — letters like مرحبا كيفك.\n"
+        "Never put romaji, Arabizi digits, English, or Japanese in arabic. TTS reads that field aloud.\n"
+        f"arabizi is your spoken reply in {latin} (field name is historical).\n"
+        f"{_talk_metalanguage_block(metalanguage, latin)}"
+        "If the latest user line begins with Start or スタート, you speak first in the scene and leave you_arabizi and you_english empty.\n"
+        f"{_talk_correction_block(metalanguage, latin)}"
+        + scene_block
         + "Saved words, newest first:\n"
         f"{vocab}\n"
         "\n"
@@ -622,15 +729,84 @@ def talk(
         opener = urllib.request.urlopen
     payload = complete(body, api_key, opener, pace=pace)
     data = json.loads(message_text(payload))
+    arabic = str(data["arabic"]).strip()
+    try:
+        arabic = arabic_for_speech(arabic)
+    except ValueError:
+        # Keep empty so the page can fall back to typing; never send romaji to TTS.
+        arabic = ""
     return {
         "you_arabizi": str(data["you_arabizi"]).strip(),
         "you_english": str(data["you_english"]).strip(),
-        "arabic": str(data["arabic"]).strip(),
+        "arabic": arabic,
         "arabizi": str(data["arabizi"]).strip(),
         "english": str(data["english"]).strip(),
         "correction": str(data["correction"]).strip(),
         "better": str(data["better"]).strip(),
     }
+
+
+def _talk_spelling_block(system: str) -> str:
+    """Latin spelling rules. Arabic script for speech is separate."""
+    if system == "romaji":
+        return (
+            "Spell Levantine in romaji (ローマ字), lowercase, the way a Japanese learner writes Arabic sounds in Latin letters.\n"
+            "Copy a saved word exactly when you use it.\n"
+            "Do not use Arabizi digit letters (2, 3, 5, 6, 7, 8, 9).\n"
+            "Use ' for ء/أ and ع, gh for غ, kh for خ, t for ط, h for ح, q for ق, s for ص, d for ض.\n"
+            "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
+            "مرحبا is marhaba (not mar7aba). قديش is qaddeesh (not 8addeesh).\n"
+        )
+    return (
+        "Spell Arabizi the way this notebook does, lowercase, and copy a saved word exactly when you use it.\n"
+        "2 is ء or أ, 3 is ع, 3' is غ, 5 is خ, 6 is ط, 7 is ح, 8 is ق, 9 is ص, 9' is ض.\n"
+        "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
+    )
+
+
+def _talk_learner_input_block(language: str, latin: str) -> str:
+    """How to read the learner's mic/typed line for this account language."""
+    if language == "ja":
+        return (
+            "The learner often speaks Japanese into the mic. They may also type Japanese or Levantine romaji.\n"
+            "Understand Japanese naturally and answer as a friend in Levantine — do not answer in Japanese speech.\n"
+            "If their latest line is Japanese (hiragana, katakana, or kanji):\n"
+            "  you_english = clean Japanese for what they meant\n"
+            f"  you_arabizi = natural Levantine {latin} for how to say that meaning (so they learn the line)\n"
+            "If their latest line is already Levantine romaji, you_arabizi is that line in this notebook's spelling,\n"
+            "and you_english is its Japanese gloss.\n"
+        )
+    return (
+        f"you_arabizi is what the learner just said, in {latin}. No Arabic script there.\n"
+        "you_english is a plain English translation of that line.\n"
+    )
+
+
+def _talk_correction_block(language: str, latin: str) -> str:
+    if language == "ja":
+        return (
+            "If they spoke Japanese, leave correction empty; you_arabizi already teaches the Levantine line.\n"
+            f"You may set better to that same {latin} line. If they tried Levantine romaji and it was off,\n"
+            "set correction to one kind Japanese sentence about what was off, and better to a fuller "
+            f"{latin} line. If it was fine, leave both empty.\n"
+        )
+    return (
+        "If their Levantine is off, set correction to one kind sentence about what was off,\n"
+        f"and better to a fuller way they could say it, in {latin}. If it was fine, leave both empty.\n"
+    )
+
+
+def _talk_metalanguage_block(language: str, latin: str) -> str:
+    """Instructions for page glosses. Latin spelling and Arabic script stay Levantine."""
+    label = metalanguage_label(language)
+    return (
+        f"The learner's metalanguage is {label}.\n"
+        f"you_english and english are plain {label} for the page "
+        "(the field names say english for historical reasons).\n"
+        f"correction, when set, is also {label}.\n"
+        f"Never put Japanese or English into you_arabizi, arabizi, or better — those stay {latin}.\n"
+        "arabic stays Arabic script only, for Sawt's speech out.\n"
+    )
 
 
 def _talk_turns(turns: list) -> list[dict]:

@@ -4,7 +4,7 @@ I wanted a real conversation that stays cheap. A realtime voice API would keep a
 
 ## Decision
 
-- **Speech in:** the browser’s SpeechRecognition (`lang: ar`), free on the device.
+- **Speech in:** the browser’s SpeechRecognition — `ar-SA` for English accounts, `ja-JP` for Japanese accounts (they speak Japanese; Sawt still answers in Levantine).
 - **Brain:** one Flash Lite chat turn per pause (`talk()`).
 - **Speech out:** one Flash Lite TTS call per reply (`arabic_speech()`).
 

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lexicon.load import connect, flag_duplicates, load_entries
+from lexicon.load import connect, flag_duplicates, load_entries, parse_vocabulary_csv
 
 
 CSV = """\
@@ -63,6 +63,17 @@ class LoadTests(unittest.TestCase):
                 "INSERT INTO duplicate_members (group_id, entry_id) VALUES (?, ?)",
                 (group_id, 9999),
             )
+
+    def test_parse_accepts_simple_word_meaning_csv(self) -> None:
+        rows = parse_vocabulary_csv("Arabizi,English\nkeefak,how are you\n")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["word"], "keefak")
+        self.assertEqual(rows[0]["meaning"], "how are you")
+        self.assertEqual(rows[0]["date_added"], "")
+
+    def test_parse_rejects_csv_without_meaning_column(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Word column and a Meaning column"):
+            parse_vocabulary_csv("Word,Status\nbas,Unmarked\n")
 
 
 if __name__ == "__main__":

@@ -10,3 +10,4 @@ Notes on the AI choices in Sawt: which model, why that one, and how the call is 
 | [004-talk-and-situations.md](004-talk-and-situations.md) | Friend Talk vs coffee / shop scenes |
 | [005-secrets.md](005-secrets.md) | Key and calendar stay off the page |
 | [006-vercel-python.md](006-vercel-python.md) | Serverless Python, Supabase, Clerk — no Next.js |
+| [007-metalanguage.md](007-metalanguage.md) | English+Arabizi vs Japanese+romaji; Arabic speech stays put |

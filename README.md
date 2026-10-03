@@ -1,6 +1,6 @@
 # Sawt
 
-Sawt is the notebook I use between Levantine lessons. After class I paste the new words in Arabizi, each one with its English meaning. Before the next class I talk with those words, or write a sentence with one of them.
+Sawt is the notebook I use between Levantine lessons. After class I paste the new words with their meanings. Before the next class I talk with those words, or write a sentence with one of them. English accounts use Arabizi and speak Arabic into the mic. Japanese accounts use romaji on the page, speak Japanese into the mic, and still hear Levantine Arabic back.
 
 Locally it runs on this computer with SQLite. On Vercel each person signs in, and their words live in Postgres. Sentence checks, Talk replies, and spoken Arabic go to OpenRouter.
 
@@ -12,11 +12,12 @@ python3 -m lexicon.serve
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is required for that local server.
 
-- **Today** is where a lesson gets pasted. `baza5 = fancy` is one pair. `practice - tadreeb` is English, then a dash, then Arabizi. A line can mix both. Preview shows the split before you save. The same spelling with the same meaning is not stored twice.
-- **Words** lists everything saved, grouped by the lesson date. Edit changes the Arabizi or the English. A spelling with a space is stored as a phrase.
-- **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Dark mode is the switch in the toolbar.
+- **Today** is where a lesson gets pasted. English: `baza5 = fancy` or `practice - tadreeb`. Japanese: `qararat = 決定` or `練習 - tadreeb` (romaji, no digit letters). Preview shows the split before you save.
+- **Settings** (under Words) has account sign-in and the English / 日本語 language switch. If the notebook is empty, **Import a CSV** accepts a sheet with Word and Meaning columns (Arabizi/Romaji and English/Gloss work too). Date Added groups rows by lesson day; rows without a date use the lesson date field.
+- **Words** lists everything saved, grouped by the lesson date. Edit changes the Latin spelling or the meaning. A spelling with a space is stored as a phrase.
+- **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance. The mic and TTS stay Arabic.
 
-Arabizi digits in this notebook: 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Long ee and oo stay as ee and oo. كيفك is keefak.
+Arabizi digits (English accounts): 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Japanese romaji uses letters instead (`h` ح, `q` ق, `kh` خ, `'` ء/ع). Long ee and oo stay as ee and oo. كيفك is keefak.
 
 The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the database. It is not printed on the page and it is not included in errors.
 

@@ -7,6 +7,7 @@ from lexicon.intake import parse_lesson_text
 from lexicon.judge import RateLimiter
 from lexicon.load import connect, flag_duplicates, load_entries
 from lexicon.notebook import (
+    import_csv,
     import_sheet,
     list_items,
     save_lesson,
@@ -169,6 +170,77 @@ class NotebookTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             talk(self.conn, [], "test-key", opener, pace=RateLimiter(min_interval=0))
 
+    def test_talk_japanese_account_uses_romaji_not_arabizi_digits(self) -> None:
+        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+
+        def opener(request, timeout):
+            body = json.loads(request.data.decode())
+            prompt = body["messages"][0]["content"]
+            self.assertIn("keefak", prompt)
+            self.assertIn("Spell Levantine in romaji", prompt)
+            self.assertIn("Do not use Arabizi digit letters", prompt)
+            self.assertIn("marhaba (not mar7aba)", prompt)
+            self.assertIn("The learner's metalanguage is Japanese.", prompt)
+            self.assertIn("those stay romaji", prompt)
+            self.assertIn("The learner often speaks Japanese into the mic.", prompt)
+            self.assertIn("Understand Japanese naturally", prompt)
+            self.assertNotIn("2 is ء or أ", prompt)
+            return _TalkResponse(
+                {
+                    "you_arabizi": "baddi ahwe",
+                    "you_english": "コーヒーください",
+                    "arabic": "بدي قهوة",
+                    "arabizi": "tfaddal",
+                    "english": "どうぞ",
+                    "correction": "",
+                    "better": "baddi ahwe",
+                }
+            )
+
+        reply = talk(
+            self.conn,
+            [{"role": "user", "text": "コーヒーください"}],
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0),
+            language="ja",
+        )
+        self.assertEqual(reply["you_arabizi"], "baddi ahwe")
+        self.assertEqual(reply["arabizi"], "tfaddal")
+        self.assertEqual(reply["arabic"], "بدي قهوة")
+        self.assertEqual(reply["english"], "どうぞ")
+
+    def test_talk_japanese_coffee_scene_uses_romaji_spellings(self) -> None:
+        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+
+        def opener(request, timeout):
+            prompt = json.loads(request.data.decode())["messages"][0]["content"]
+            self.assertIn("helo", prompt)
+            self.assertIn("qaddeesh", prompt)
+            self.assertNotIn("7elo", prompt)
+            return _TalkResponse(
+                {
+                    "you_arabizi": "",
+                    "you_english": "",
+                    "arabic": "أهلا",
+                    "arabizi": "ahla",
+                    "english": "こんにちは",
+                    "correction": "",
+                    "better": "",
+                }
+            )
+
+        reply = talk(
+            self.conn,
+            [{"role": "user", "text": "Start. You speak first."}],
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0),
+            language="ja",
+            scene="coffee",
+        )
+        self.assertEqual(reply["arabizi"], "ahla")
+
     def test_sheet_import_is_searchable_by_spelling_and_meaning(self) -> None:
         csv_path = Path(self.tmp.name) / "vocab.csv"
         csv_path.write_text(
@@ -197,6 +269,28 @@ class NotebookTests(unittest.TestCase):
         lonely = search_items(self.conn, "lonely", embed=embed)
         self.assertEqual(lonely[0]["spelling"], "we7deh")
         self.assertEqual(lonely[0]["match"], "meaning")
+
+    def test_csv_upload_fills_an_empty_notebook(self) -> None:
+        def embed(texts: list[str]) -> list[list[float]]:
+            return [[0.0, 0.0] for _ in texts]
+
+        csv_text = (
+            "Word,Meaning,Date Added\n"
+            "keefak,how are you,18 June 2026 15:15\n"
+            "joking,maze7,18 June 2026 15:16\n"
+            "jamme3,plural,18 June 2026 15:17\n"
+            "bas,but,\n"
+        )
+        first = import_csv(self.conn, csv_text, embed=embed, default_day="2026-10-03")
+        self.assertEqual(first["items"], 3)
+        self.assertEqual(first["days"], 2)
+        spellings = {item["spelling"] for item in list_items(self.conn)}
+        self.assertEqual(spellings, {"keefak", "maze7", "bas"})
+        by_day = {item["spelling"]: item["learned_on"] for item in list_items(self.conn)}
+        self.assertEqual(by_day["keefak"], "2026-06-18")
+        self.assertEqual(by_day["bas"], "2026-10-03")
+        with self.assertRaisesRegex(ValueError, "no new words"):
+            import_csv(self.conn, csv_text, embed=embed, default_day="2026-10-03")
 
 
 if __name__ == "__main__":

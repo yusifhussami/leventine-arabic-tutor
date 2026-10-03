@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import os
 import sqlite3
 from pathlib import Path
@@ -21,6 +22,12 @@ REQUIRED_COLUMNS = {
     "Meaning",
     "Status",
 }
+
+_WORD_HEADERS = frozenset({"word", "arabizi", "romaji", "spelling", "latin"})
+_MEANING_HEADERS = frozenset(
+    {"meaning", "english", "gloss", "japanese", "日本語", "translation"}
+)
+_DATE_HEADERS = frozenset({"date added", "date", "learned on", "learned_on", "day"})
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS entries (
@@ -186,6 +193,69 @@ def normalize_word(word: str) -> str:
 def normalize_meaning(meaning: str) -> str:
     text = meaning.strip().casefold()
     return " ".join(text.split())
+
+
+def _header_map(fieldnames: list[str] | None) -> dict[str, str]:
+    """Map logical fields to the CSV header names that are present."""
+    found: dict[str, str] = {}
+    for name in fieldnames or []:
+        key = " ".join((name or "").strip().casefold().split())
+        if key in _WORD_HEADERS and "word" not in found:
+            found["word"] = name
+        elif key in _MEANING_HEADERS and "meaning" not in found:
+            found["meaning"] = name
+        elif key in _DATE_HEADERS and "date" not in found:
+            found["date"] = name
+        elif key == "category" and "category" not in found:
+            found["category"] = name
+        elif key == "imperative" and "imperative" not in found:
+            found["imperative"] = name
+        elif key == "status" and "status" not in found:
+            found["status"] = name
+    return found
+
+
+def parse_vocabulary_csv(text: str) -> list[dict]:
+    """Read a vocabulary CSV from text into row dicts for notebook import.
+
+    Needs a spelling column (Word / Arabizi / Romaji / Spelling) and a meaning
+    column (Meaning / English / Gloss). Date Added is optional. Extra Notion
+    columns are kept when present.
+    """
+    if text is None or not str(text).strip():
+        raise ValueError("CSV is empty")
+    handle = io.StringIO(str(text).lstrip("\ufeff"))
+    reader = csv.DictReader(handle)
+    columns = _header_map(reader.fieldnames)
+    if "word" not in columns or "meaning" not in columns:
+        raise ValueError(
+            "CSV needs a Word column and a Meaning column "
+            "(Arabizi/Romaji/Spelling and English/Gloss also work)"
+        )
+    rows: list[dict] = []
+    for source_row, row in enumerate(reader, start=1):
+        rows.append(
+            {
+                "source_row": source_row,
+                "word": row.get(columns["word"]) or "",
+                "meaning": row.get(columns["meaning"]) or "",
+                "date_added": (row.get(columns["date"]) or "").strip()
+                if "date" in columns
+                else "",
+                "category": (row.get(columns["category"]) or "").strip()
+                if "category" in columns
+                else "",
+                "imperative": (row.get(columns["imperative"]) or "").strip()
+                if "imperative" in columns
+                else "",
+                "status": (row.get(columns["status"]) or "").strip()
+                if "status" in columns
+                else "",
+            }
+        )
+    if not rows:
+        raise ValueError("CSV has no data rows")
+    return rows
 
 
 def load_entries(conn: sqlite3.Connection, csv_path: Path | str) -> int:

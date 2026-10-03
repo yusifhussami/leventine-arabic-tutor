@@ -1,9 +1,10 @@
-"""Split a pasted lesson into Arabizi spellings and English glosses.
+"""Split a pasted lesson into Latin spellings and glosses.
 
-Two shapes can sit in the same paste. `practice - tadreeb` is English, then
-a dash, then one Arabizi word. `8ararat = decisions` is Arabizi, then equals,
-then English. A chain of equals signs still works: the English gloss runs
-until the next token that contains an Arabizi digit (2, 3, 5, 6, 7, 8, 9).
+Two shapes can sit in the same paste. `practice - tadreeb` is the meaning,
+then a dash, then one Latin spelling (Arabizi or romaji). `8ararat = decisions`
+or `qararat = 決定` is spelling, then equals, then the gloss. A chain of equals
+signs still works: the gloss runs until the next token that contains an Arabizi
+digit (2, 3, 5, 6, 7, 8, 9), or the last token when there is no digit (romaji).
 Letter-only words such as "al" stay inside that phrase once the digit has
 started it.
 """
