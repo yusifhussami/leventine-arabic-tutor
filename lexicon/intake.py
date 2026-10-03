@@ -51,7 +51,6 @@ def _parse_mixed(text: str) -> list[tuple[str, str]]:
 
 
 def _cut_equals_gloss(right: str) -> tuple[str, str]:
-    """English after '=' until the next Arabizi spelling or dash pair."""
     right = right.strip()
     equals_at = right.find("=")
     if equals_at == -1:

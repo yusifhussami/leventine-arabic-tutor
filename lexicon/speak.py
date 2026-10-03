@@ -1,8 +1,7 @@
-"""Turn an Arabic reply into an mp3 the browser can play.
+"""Turn an Arabic reply into a wav the browser can play.
 
-The Mac voice only comes out of this computer. A phone, or someone else's
-browser, needs the sound in the response. Gemini Flash Lite TTS is the
-cheap speech model on the same OpenRouter key.
+Gemini Flash Lite TTS returns PCM on OpenRouter. The wav wrapper is what
+phones and other browsers can play from the response.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ SAMPLE_RATE = 24000
 
 
 def arabic_speech(text: str, api_key: str, opener=urllib.request.urlopen) -> bytes:
-    """Return mp3 bytes. The key goes in a header, not the URL."""
+    """Return wav bytes. The key goes in a header, not the URL."""
     line = " ".join(text.split())
     if not line:
         raise ValueError("nothing to say")

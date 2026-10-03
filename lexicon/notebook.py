@@ -531,7 +531,7 @@ def talk(conn: sqlite3.Connection, turns: list, api_key: str, opener=None, pace=
     """One short Levantine reply that prefers words already saved.
 
     The newest saved words are the ones the model sees, so a turn stays small.
-    The Mac speaks the Arabic line. Arabizi and English are for the page.
+    Arabic script is for speech. Arabizi and English are for the page.
     """
     history = _talk_turns(turns)
     drop_exact_duplicates(conn)
