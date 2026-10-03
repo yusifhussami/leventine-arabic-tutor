@@ -9,9 +9,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
+from lexicon.db import LOCAL_USER, open_db
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
-from lexicon.load import connect
 from lexicon.notebook import (
     drop_exact_duplicates,
     judge_saved_item,
@@ -24,7 +24,9 @@ from lexicon.notebook import (
 )
 from lexicon.speak import arabic_speech
 
-PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
+PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
+if not PAGE.exists():
+    PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 DB_PATH = Path("lexicon.db")
 
 
@@ -34,14 +36,17 @@ class NotebookHandler(BaseHTTPRequestHandler):
         if path == "/":
             self._bytes(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             return
+        if path == "/api/config":
+            self._json(200, {"clerkPublishableKey": "", "authRequired": False})
+            return
         if path == "/api/next-lesson":
-            conn = connect(DB_PATH)
+            conn = open_db(DB_PATH)
             try:
-                if not calendar_connected(conn):
+                if not calendar_connected(conn, LOCAL_USER):
                     self._json(200, {"connected": False, "lesson": None})
                     return
                 try:
-                    lesson = next_lesson(conn)
+                    lesson = next_lesson(conn, user_id=LOCAL_USER)
                 except Exception:
                     self._json(502, {"error": "could not read the calendar"})
                     return
@@ -50,19 +55,24 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 conn.close()
             return
         if path == "/api/items":
-            conn = connect(DB_PATH)
+            conn = open_db(DB_PATH)
             try:
-                drop_exact_duplicates(conn)
+                drop_exact_duplicates(conn, LOCAL_USER)
                 query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
-                self._json(200, search_items(conn, query) if query.strip() else list_items(conn))
+                self._json(
+                    200,
+                    search_items(conn, query, user_id=LOCAL_USER)
+                    if query.strip()
+                    else list_items(conn, user_id=LOCAL_USER),
+                )
             finally:
                 conn.close()
             return
         if path.startswith("/api/items/") and path.endswith("/similar"):
             item_id = path.removeprefix("/api/items/").removesuffix("/similar").strip("/")
-            conn = connect(DB_PATH)
+            conn = open_db(DB_PATH)
             try:
-                self._json(200, similar_items(conn, int(item_id)))
+                self._json(200, similar_items(conn, int(item_id), user_id=LOCAL_USER))
             except ValueError:
                 self._json(404, {"error": "not found"})
             finally:
@@ -79,9 +89,9 @@ class NotebookHandler(BaseHTTPRequestHandler):
             return
         try:
             if path == "/api/calendar":
-                conn = connect(DB_PATH)
+                conn = open_db(DB_PATH)
                 try:
-                    save_calendar_url(conn, body.get("url") or "")
+                    save_calendar_url(conn, body.get("url") or "", LOCAL_USER)
                 finally:
                     conn.close()
                 self._json(200, {"connected": True})
@@ -97,21 +107,24 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 )
                 return
             if path == "/api/lessons":
-                conn = connect(DB_PATH)
+                conn = open_db(DB_PATH)
                 try:
-                    saved = save_lesson(conn, body["learned_on"], body.get("text") or "")
+                    saved = save_lesson(
+                        conn, body["learned_on"], body.get("text") or "", user_id=LOCAL_USER
+                    )
                 finally:
                     conn.close()
                 self._json(200, saved)
                 return
             if path == "/api/talk":
-                conn = connect(DB_PATH)
+                conn = open_db(DB_PATH)
                 try:
                     reply = talk(
                         conn,
                         body.get("turns") or [],
                         read_api_key(),
                         scene=body.get("scene") or "",
+                        user_id=LOCAL_USER,
                     )
                 finally:
                     conn.close()
@@ -122,13 +135,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._bytes(200, audio, "audio/wav")
                 return
             if path == "/api/practice":
-                conn = connect(DB_PATH)
+                conn = open_db(DB_PATH)
                 try:
                     result = judge_saved_item(
                         conn,
                         int(body["item_id"]),
                         body.get("sentence") or "",
                         read_api_key(),
+                        user_id=LOCAL_USER,
                     )
                 finally:
                     conn.close()
@@ -158,9 +172,15 @@ class NotebookHandler(BaseHTTPRequestHandler):
         except ValueError:
             self._json(404, {"error": "not found"})
             return
-        conn = connect(DB_PATH)
+        conn = open_db(DB_PATH)
         try:
-            updated = update_item(conn, item_id, body.get("spelling") or "", body.get("gloss") or "")
+            updated = update_item(
+                conn,
+                item_id,
+                body.get("spelling") or "",
+                body.get("gloss") or "",
+                user_id=LOCAL_USER,
+            )
         except (ValueError, LookupError) as exc:
             self._json(400, {"error": str(exc)})
             return
@@ -191,7 +211,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
     DB_PATH = args.db_path
-    connect(DB_PATH).close()
+    open_db(DB_PATH).close()
     server = ThreadingHTTPServer((args.host, args.port), NotebookHandler)
     print(f"http://{args.host}:{args.port}")
     server.serve_forever()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import math
-import sqlite3
 import urllib.request
 from datetime import datetime, timezone
 
@@ -18,6 +17,7 @@ from lexicon.judge import (
     message_text,
     read_api_key,
 )
+from lexicon.db import LOCAL_USER, insert_id
 from lexicon.load import normalize_meaning, normalize_word
 from lexicon.lessons import parse_date_added
 from lexicon.practice import PracticeCard, PracticeSession, _oriented
@@ -30,20 +30,30 @@ _IMPORT_MARK = "imported from vocabulary.csv"
 _BATCH = 64
 
 
-def _known_pairs(conn: sqlite3.Connection) -> set[tuple[str, str]]:
-    rows = conn.execute("SELECT spelling, gloss FROM lesson_items").fetchall()
+def _known_pairs(conn, user_id: str = LOCAL_USER) -> set[tuple[str, str]]:
+    rows = conn.execute(
+        """
+        SELECT i.spelling, i.gloss
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE l.user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
     return {(normalize_word(row["spelling"]), normalize_meaning(row["gloss"])) for row in rows}
 
 
-def drop_exact_duplicates(conn: sqlite3.Connection) -> int:
+def drop_exact_duplicates(conn, user_id: str = LOCAL_USER) -> int:
     """Keep the newest copy of a spelling with the same meaning. Other glosses stay."""
     rows = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
+        WHERE l.user_id = ?
         ORDER BY l.learned_on DESC, l.id DESC, i.id DESC
-        """
+        """,
+        (user_id,),
     ).fetchall()
     seen: set[tuple[str, str]] = set()
     remove: list[int] = []
@@ -62,17 +72,18 @@ def drop_exact_duplicates(conn: sqlite3.Connection) -> int:
 
 
 def save_lesson(
-    conn: sqlite3.Connection,
+    conn,
     learned_on: str,
     raw_text: str,
     embed=None,
+    user_id: str = LOCAL_USER,
 ) -> dict:
     """Parse the paste, store the lesson, and attach a gloss vector when one exists.
 
     A spelling with the same meaning as one already saved is not stored again.
     """
     parsed = [(spelling, gloss) for spelling, gloss in parse_lesson_text(raw_text)]
-    known = _known_pairs(conn)
+    known = _known_pairs(conn, user_id)
     pairs = []
     skipped = []
     for spelling, gloss in parsed:
@@ -96,21 +107,21 @@ def save_lesson(
 
     created_at = datetime.now(timezone.utc).isoformat()
     with conn:
-        cursor = conn.execute(
-            "INSERT INTO lessons (learned_on, raw_text, created_at) VALUES (?, ?, ?)",
-            (learned_on, raw_text.strip(), created_at),
+        lesson_id = insert_id(
+            conn,
+            "INSERT INTO lessons (user_id, learned_on, raw_text, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, learned_on, raw_text.strip(), created_at),
         )
-        lesson_id = int(cursor.lastrowid)
         items = []
         for position, (spelling, gloss) in enumerate(pairs):
-            item_cursor = conn.execute(
+            item_id = insert_id(
+                conn,
                 """
                 INSERT INTO lesson_items (lesson_id, position, spelling, gloss, kind)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (lesson_id, position, spelling, gloss, item_kind(spelling)),
             )
-            item_id = int(item_cursor.lastrowid)
             vector = vectors[position]
             if vector:
                 conn.execute(
@@ -178,17 +189,17 @@ def import_sheet(conn: sqlite3.Connection, embed=None) -> dict:
     days = 0
     for day, triples in by_day.items():
         exists = conn.execute(
-            "SELECT id FROM lessons WHERE learned_on = ? AND raw_text = ?",
-            (day, _IMPORT_MARK),
+            "SELECT id FROM lessons WHERE user_id = ? AND learned_on = ? AND raw_text = ?",
+            (LOCAL_USER, day, _IMPORT_MARK),
         ).fetchone()
         if exists:
             continue
         days += 1
-        added += _store_imported_day(conn, day, triples, embed)
+        added += _store_imported_day(conn, day, triples, embed, LOCAL_USER)
     return {"days": days, "items": added}
 
 
-def _store_imported_day(conn, day: str, triples, embed) -> int:
+def _store_imported_day(conn, day: str, triples, embed, user_id: str = LOCAL_USER) -> int:
     spellings = [(spelling, gloss, kind) for spelling, gloss, kind in triples]
     vectors: list[list[float] | None] = []
     glosses = [gloss for _, gloss, _ in spellings]
@@ -202,13 +213,14 @@ def _store_imported_day(conn, day: str, triples, embed) -> int:
         vectors = [None] * len(spellings)
     created_at = datetime.now(timezone.utc).isoformat()
     with conn:
-        lesson = conn.execute(
-            "INSERT INTO lessons (learned_on, raw_text, created_at) VALUES (?, ?, ?)",
-            (day, _IMPORT_MARK, created_at),
+        lesson_id = insert_id(
+            conn,
+            "INSERT INTO lessons (user_id, learned_on, raw_text, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, day, _IMPORT_MARK, created_at),
         )
-        lesson_id = int(lesson.lastrowid)
         for position, ((spelling, gloss, kind), vector) in enumerate(zip(spellings, vectors)):
-            item = conn.execute(
+            item_id = insert_id(
+                conn,
                 """
                 INSERT INTO lesson_items (lesson_id, position, spelling, gloss, kind)
                 VALUES (?, ?, ?, ?, ?)
@@ -218,17 +230,17 @@ def _store_imported_day(conn, day: str, triples, embed) -> int:
             if vector:
                 conn.execute(
                     "INSERT INTO lesson_embeddings (item_id, model, vector) VALUES (?, ?, ?)",
-                    (int(item.lastrowid), EMBED_MODEL, json.dumps(vector)),
+                    (item_id, EMBED_MODEL, json.dumps(vector)),
                 )
     return len(spellings)
 
 
-def search_items(conn: sqlite3.Connection, query: str, embed=None, limit: int = 40) -> list[dict]:
+def search_items(conn, query: str, embed=None, limit: int = 40, user_id: str = LOCAL_USER) -> list[dict]:
     """Spelling hits first, then glosses close in meaning to an English query."""
     needle = _fold(query)
     if len(needle) < 2:
-        return list_items(conn)
-    items = list_items(conn)
+        return list_items(conn, user_id=user_id)
+    items = list_items(conn, user_id=user_id)
     hits = []
     seen = set()
     arabizi = any(char in "2356789" for char in needle)
@@ -256,7 +268,9 @@ def search_items(conn: sqlite3.Connection, query: str, embed=None, limit: int = 
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
-        """
+        WHERE l.user_id = ?
+        """,
+        (user_id,),
     ).fetchall()
     ranked = []
     for row in stored:
@@ -288,24 +302,27 @@ def _fold(text: str) -> str:
     return " ".join(folded.split())
 
 
-def list_items(conn: sqlite3.Connection) -> list[dict]:
+def list_items(conn, user_id: str = LOCAL_USER) -> list[dict]:
     rows = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
+        WHERE l.user_id = ?
         ORDER BY l.learned_on DESC, l.id DESC, i.position
-        """
+        """,
+        (user_id,),
     ).fetchall()
     return [dict(row) for row in rows]
 
 
 def update_item(
-    conn: sqlite3.Connection,
+    conn,
     item_id: int,
     spelling: str,
     gloss: str,
     embed=None,
+    user_id: str = LOCAL_USER,
 ) -> dict:
     """Replace one saved spelling and gloss. A new gloss gets a new vector."""
     spelling = spelling.strip()
@@ -313,13 +330,26 @@ def update_item(
     if not spelling or not gloss:
         raise ValueError("need a word and a meaning")
     current = conn.execute(
-        "SELECT id, gloss FROM lesson_items WHERE id = ?",
-        (item_id,),
+        """
+        SELECT i.id, i.gloss
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE i.id = ? AND l.user_id = ?
+        """,
+        (item_id, user_id),
     ).fetchone()
     if current is None:
         raise LookupError(f"no item {item_id}")
     key = (normalize_word(spelling), normalize_meaning(gloss))
-    for other in conn.execute("SELECT id, spelling, gloss FROM lesson_items WHERE id != ?", (item_id,)):
+    for other in conn.execute(
+        """
+        SELECT i.id, i.spelling, i.gloss
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE i.id != ? AND l.user_id = ?
+        """,
+        (item_id, user_id),
+    ):
         if (normalize_word(other["spelling"]), normalize_meaning(other["gloss"])) == key:
             raise ValueError("that word is already saved")
     kind = item_kind(spelling)
@@ -354,21 +384,24 @@ def update_item(
         SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
-        WHERE i.id = ?
+        WHERE i.id = ? AND l.user_id = ?
         """,
-        (item_id,),
+        (item_id, user_id),
     ).fetchone()
     return dict(row)
 
 
-def similar_items(conn: sqlite3.Connection, item_id: int, limit: int = 5) -> list[dict]:
+def similar_items(conn, item_id: int, limit: int = 5, user_id: str = LOCAL_USER) -> list[dict]:
     """Nearest other glosses by cosine similarity. Items without a vector are skipped."""
     rows = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss, i.kind, e.vector
         FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
-        """
+        WHERE l.user_id = ?
+        """,
+        (user_id,),
     ).fetchall()
     target = None
     others = []
@@ -395,20 +428,22 @@ def similar_items(conn: sqlite3.Connection, item_id: int, limit: int = 5) -> lis
 
 
 def judge_saved_item(
-    conn: sqlite3.Connection,
+    conn,
     item_id: int,
     sentence: str,
     api_key: str,
     opener=urllib.request.urlopen,
+    user_id: str = LOCAL_USER,
 ) -> dict:
     """Judge a sentence for one saved item and keep the reply on that item."""
     row = conn.execute(
         """
-        SELECT id, lesson_id, spelling, gloss, kind
-        FROM lesson_items
-        WHERE id = ?
+        SELECT i.id, i.lesson_id, i.spelling, i.gloss, i.kind
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE i.id = ? AND l.user_id = ?
         """,
-        (item_id,),
+        (item_id, user_id),
     ).fetchone()
     if row is None:
         raise LookupError(f"no item {item_id}")
@@ -427,7 +462,7 @@ def judge_saved_item(
         """,
         (row["lesson_id"], item_id),
     ).fetchall()
-    for other in list(siblings) + similar_items(conn, item_id):
+    for other in list(siblings) + similar_items(conn, item_id, user_id=user_id):
         card = PracticeCard(other["id"], other["kind"], other["spelling"], other["gloss"])
         if card not in cards:
             cards.append(card)
@@ -438,7 +473,8 @@ def judge_saved_item(
     )
     created_at = datetime.now(timezone.utc).isoformat()
     with conn:
-        attempt = conn.execute(
+        attempt_id = insert_id(
+            conn,
             "INSERT INTO lesson_attempts (item_id, sentence, created_at) VALUES (?, ?, ?)",
             (item_id, text, created_at),
         )
@@ -449,7 +485,7 @@ def judge_saved_item(
             ) VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
-                int(attempt.lastrowid),
+                attempt_id,
                 MODEL,
                 int(uses_target),
                 int(fits_meaning),
@@ -461,7 +497,7 @@ def judge_saved_item(
         "uses_target": uses_target,
         "fits_meaning": fits_meaning,
         "comment": comment,
-        "similar": similar_items(conn, item_id),
+        "similar": similar_items(conn, item_id, user_id=user_id),
     }
 
 
@@ -527,17 +563,25 @@ _SCENES = {
 }
 
 
-def talk(conn: sqlite3.Connection, turns: list, api_key: str, opener=None, pace=None, scene: str = "") -> dict:
+def talk(
+    conn,
+    turns: list,
+    api_key: str,
+    opener=None,
+    pace=None,
+    scene: str = "",
+    user_id: str = LOCAL_USER,
+) -> dict:
     """One short Levantine reply that prefers words already saved.
 
     The newest saved words are the ones the model sees, so a turn stays small.
     Arabic script is for speech. Arabizi and English are for the page.
     """
     history = _talk_turns(turns)
-    drop_exact_duplicates(conn)
+    drop_exact_duplicates(conn, user_id=user_id)
     seen: set[str] = set()
     chosen = []
-    for item in list_items(conn):
+    for item in list_items(conn, user_id=user_id):
         key = normalize_word(item["spelling"])
         if not key or key in seen:
             continue

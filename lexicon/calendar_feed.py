@@ -6,38 +6,46 @@ event whose title contains "preply" or "arabic".
 
 from __future__ import annotations
 
-import sqlite3
 import urllib.request
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from lexicon.db import LOCAL_USER
+
 _CALENDAR_HOSTS = ("calendar.google.com",)
 
 
-def save_calendar_url(conn: sqlite3.Connection, url: str) -> None:
+def save_calendar_url(conn, url: str, user_id: str = LOCAL_USER) -> None:
     cleaned = url.strip()
     if not _allowed(cleaned):
         raise ValueError("paste the private iCal link from Google Calendar")
     with conn:
         conn.execute(
-            "INSERT INTO settings (key, value) VALUES ('calendar_url', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (cleaned,),
+            "INSERT INTO settings (user_id, key, value) VALUES (?, 'calendar_url', ?) "
+            "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+            (user_id, cleaned),
         )
 
 
-def calendar_connected(conn: sqlite3.Connection) -> bool:
-    row = conn.execute("SELECT value FROM settings WHERE key = 'calendar_url'").fetchone()
+def calendar_connected(conn, user_id: str = LOCAL_USER) -> bool:
+    row = conn.execute(
+        "SELECT value FROM settings WHERE user_id = ? AND key = 'calendar_url'",
+        (user_id,),
+    ).fetchone()
     return bool(row and row["value"])
 
 
 def next_lesson(
-    conn: sqlite3.Connection,
+    conn,
     now: datetime | None = None,
     fetch=None,
+    user_id: str = LOCAL_USER,
 ) -> dict | None:
     """The next future event titled as an Arabic lesson, or None."""
-    row = conn.execute("SELECT value FROM settings WHERE key = 'calendar_url'").fetchone()
+    row = conn.execute(
+        "SELECT value FROM settings WHERE user_id = ? AND key = 'calendar_url'",
+        (user_id,),
+    ).fetchone()
     if row is None or not row["value"]:
         return None
     if fetch is None:

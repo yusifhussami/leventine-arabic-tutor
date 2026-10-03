@@ -2,15 +2,15 @@
 
 Sawt is the notebook I use between Levantine lessons. After class I paste the new words in Arabizi, each one with its English meaning. Before the next class I talk with those words, or write a sentence with one of them.
 
-The page runs on this computer. Words and the calendar link stay in a local database. Sentence checks, Talk replies, and spoken Arabic go to OpenRouter.
+Locally it runs on this computer with SQLite. On Vercel each person signs in, and their words live in Postgres. Sentence checks, Talk replies, and spoken Arabic go to OpenRouter.
 
-## Use it
+## Use it locally
 
 ```bash
 python3 -m lexicon.serve
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is required for that local server.
 
 - **Today** is where a lesson gets pasted. `baza5 = fancy` is one pair. `practice - tadreeb` is English, then a dash, then Arabizi. A line can mix both. Preview shows the split before you save. The same spelling with the same meaning is not stored twice.
 - **Words** lists everything saved, grouped by the lesson date. Edit changes the Arabizi or the English. A spelling with a space is stored as a phrase.
@@ -18,9 +18,27 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765).
 
 Arabizi digits in this notebook: 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Long ee and oo stay as ee and oo. كيفك is keefak.
 
-The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the local database. It is not printed on the page and it is not included in errors.
+The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the database. It is not printed on the page and it is not included in errors.
 
-## On a phone
+## Deploy on Vercel
+
+The app stays in Python: static HTML in `public/`, API routes in `api/`, shared logic in `lexicon/`.
+
+1. Create a Vercel project from this repo.
+2. Create a free [Supabase](https://supabase.com) project. In Project Settings → Database, copy the URI. Prefer the **Transaction** pooler (port `6543`) for Vercel. Set that as `DATABASE_URL`.
+3. Create a Clerk application. Set `CLERK_PUBLISHABLE_KEY` and `CLERK_JWKS_URL` (the JWKS URL from the Clerk dashboard).
+4. Set `OPENROUTER_API_KEY` (or `GEMINI_API_KEY`).
+5. Deploy. Sign-in is required on the hosted URL. Each account only sees its own lessons and calendar link.
+
+Optional local packages for Postgres and JWT checks:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+To point local serve at the same Supabase database, put `DATABASE_URL` in `.env`. Without it, local serve keeps using `lexicon.db`.
+
+## On a phone (local network)
 
 `127.0.0.1` only works on the computer running the notebook. On the same Wi‑Fi:
 
@@ -28,31 +46,32 @@ The next Preply or Arabic lesson shows in the side column after you paste the pr
 python3 -m lexicon.serve --host 0.0.0.0
 ```
 
-Then open `http://` followed by this computer's local IP and `:8765`. Anyone on that address can use your words and your API key, so keep it off public networks. Speech uses Gemini Flash Lite TTS, about a cent a minute.
+Then open `http://` followed by this computer's local IP and `:8765`. Anyone on that address can use your words and your API key, so keep it off public networks. The hosted Vercel URL is the better way to share accounts. Speech uses Gemini Flash Lite TTS, about a cent a minute.
 
-## Keep the key local
+## Keep secrets out of git
 
-Copy `.env.example` to `.env` and set `OPENROUTER_API_KEY`. `GEMINI_API_KEY` is accepted as the same key.
+Copy `.env.example` to `.env` for local values. On Vercel, set the same names in project env.
 
 | Call | Model |
 | --- | --- |
 | Sentence check and Talk | `google/gemini-3.5-flash-lite` |
 | Spoken Arabic | `google/gemini-3.8-flash-lite-tts` |
 
-These files stay on the machine and are ignored by git:
-
-| File | What it holds |
+| Name | What it holds |
 | --- | --- |
-| `.env` | The API key |
-| `lexicon.db` | Saved words, judgments, and the calendar link |
+| `OPENROUTER_API_KEY` | OpenRouter key (header only) |
+| `DATABASE_URL` | Supabase Postgres URI (hosted; optional locally) |
+| `CLERK_PUBLISHABLE_KEY` | Browser sign-in |
+| `CLERK_JWKS_URL` | Server JWT check |
+| `lexicon.db` | Local SQLite when `DATABASE_URL` is unset |
 
 `data/vocabulary.csv` is the older sheet export. It has Arabizi and English only, no account details.
 
-Python 3.9 is enough. There are no extra packages to install.
+Python 3.9 is enough for the local server with no extra packages. Hosted deploy uses `requirements.txt`.
 
 ## Decisions
 
-Why each model, and how the voice loop is wired: [docs/decisions](docs/decisions).
+Why each model, the voice loop, and the Vercel shape: [docs/decisions](docs/decisions).
 
 ## Tests
 

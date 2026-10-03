@@ -81,10 +81,14 @@ CREATE TABLE IF NOT EXISTS judgments (
 -- A dated batch of words the learner types after a lesson.
 CREATE TABLE IF NOT EXISTS lessons (
     id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT 'local',
     learned_on TEXT NOT NULL,
     raw_text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_lessons_user
+    ON lessons (user_id, learned_on DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS lesson_items (
     id INTEGER PRIMARY KEY,
@@ -121,8 +125,10 @@ CREATE TABLE IF NOT EXISTS lesson_judgments (
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
 );
 """
 
@@ -138,10 +144,36 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    migrate_notebook_schema(conn)
     path = Path(db_path)
     if path.exists():
         os.chmod(path, 0o600)
     return conn
+
+
+def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
+    """Add user_id columns for older local databases."""
+    lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
+    if lesson_cols and "user_id" not in lesson_cols:
+        conn.execute("ALTER TABLE lessons ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'")
+        conn.commit()
+    setting_cols = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
+    if setting_cols and "user_id" not in setting_cols:
+        conn.executescript(
+            """
+            CREATE TABLE settings_v2 (
+                user_id TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                PRIMARY KEY (user_id, key)
+            );
+            INSERT INTO settings_v2 (user_id, key, value)
+            SELECT 'local', key, value FROM settings;
+            DROP TABLE settings;
+            ALTER TABLE settings_v2 RENAME TO settings;
+            """
+        )
+        conn.commit()
 
 
 def normalize_word(word: str) -> str:
