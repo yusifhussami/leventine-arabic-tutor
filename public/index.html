@@ -2095,18 +2095,18 @@
 
     function openVoice() {
       unlockAudio();
+      // Every open is a new call — never resume an old transcript.
+      if (!conversing) clearTalkHistory();
       showVoiceLine("", "");
       setTalkLabel("Listening");
       startLevel();
       markScene();
-      if (scene && talkLog.length === 0) {
+      if (scene) {
         beginScene();
         return;
       }
-      if (!conversing) {
-        conversing = true;
-        startTalk();
-      }
+      conversing = true;
+      startTalk();
     }
 
     async function beginScene() {
@@ -2141,9 +2141,27 @@
       else setTalkLabel("Talk");
     }
 
+    function clearTalkHistory() {
+      talkLog.length = 0;
+      draft = "";
+      pending = "";
+      if (pauseTimer) {
+        clearTimeout(pauseTimer);
+        pauseTimer = null;
+      }
+      const chat = document.querySelector("#talk-log");
+      if (chat) chat.replaceChildren();
+      showVoiceLine("", "");
+      const err = document.querySelector("#talk-error");
+      if (err) err.textContent = "";
+    }
+
     function closeVoice() {
+      // Closing the agent always starts a fresh convo next time.
+      scene = "";
       stopLevel();
       stopConversation();
+      clearTalkHistory();
       markScene();
     }
 
@@ -2225,12 +2243,15 @@
     function stopConversation() {
       conversing = false;
       clearTimeout(pauseTimer);
+      pauseTimer = null;
       pending = "";
       draft = "";
       const current = listening;
       listening = null;
-      if (current) current.stop();
-      player.pause();
+      if (current) {
+        try { current.stop(); } catch (err) {}
+      }
+      try { player.pause(); } catch (err) {}
       setTalkLabel("Talk");
     }
 
@@ -2394,11 +2415,9 @@
 
     document.querySelector("#orb").onclick = () => {
       if (conversing) {
-        scene = "";
         closeVoice();
         return;
       }
-      scene = "";
       openVoice();
     };
     document.querySelectorAll("[data-scene]").forEach((button) => {
@@ -2407,10 +2426,8 @@
           stopConversation();
           stopLevel();
         }
+        clearTalkHistory();
         scene = button.dataset.scene;
-        talkLog.length = 0;
-        document.querySelector("#talk-log").replaceChildren();
-        showVoiceLine("", "");
         openVoice();
       });
     });
@@ -2418,6 +2435,11 @@
       if (event.key !== "Enter") return;
       const field = event.currentTarget;
       unlockAudio();
+      // Typed turns join the live call; if none is open, start a new one.
+      if (!conversing) {
+        clearTalkHistory();
+        startLevel();
+      }
       conversing = true;
       const line = field.value;
       field.value = "";
