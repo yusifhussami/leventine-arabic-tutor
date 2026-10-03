@@ -630,6 +630,20 @@
       border-radius: 12px;
       border: 1px solid color-mix(in srgb, var(--separator) 70%, transparent);
     }
+    .checklist-group {
+      margin-top: 22px;
+    }
+    .checklist-group[hidden] { display: none; }
+    .checklist-group-label {
+      margin: 0 4px 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--secondary);
+      letter-spacing: -0.01em;
+    }
+    .checklist-done .checklist-item.is-done .checklist-title {
+      text-decoration: none;
+    }
     .checklist-composer .plus {
       width: 22px;
       height: 22px;
@@ -860,7 +874,7 @@
         <div id="pane-checklist" class="pane" hidden>
           <div class="checklist-shell">
             <h2 data-i18n="tabChecklist">Checklist</h2>
-            <p class="hint" data-i18n="checklistHint">Light goals for this language. Tap the chevron for a note.</p>
+            <p class="hint" data-i18n="checklistHint">Light goals for this language. Tap the chevron for a note. Tick to move into Done — untick to bring it back.</p>
             <ul id="checklist" class="checklist" aria-label="Checklist"></ul>
             <div class="checklist-composer">
               <span class="plus" aria-hidden="true">
@@ -869,6 +883,10 @@
               <input id="checklist-new" type="text" data-i18n-placeholder="checklistNew" placeholder="New item" autocomplete="off">
             </div>
             <p id="checklist-empty" class="checklist-empty" data-i18n="checklistEmpty">No items yet.</p>
+            <section id="checklist-done-group" class="checklist-group" hidden>
+              <h3 class="checklist-group-label" data-i18n="checklistDone">Done</h3>
+              <ul id="checklist-done" class="checklist checklist-done" aria-label="Done"></ul>
+            </section>
           </div>
         </div>
 
@@ -926,9 +944,10 @@
       tabWords: "Words",
       tabChecklist: "Checklist",
       tabSettings: "Settings",
-      checklistHint: "Light goals for this language. Tap the chevron for a note.",
+      checklistHint: "Light goals for this language. Tap the chevron for a note. Tick to move into Done — untick to bring it back.",
       checklistNew: "New item",
       checklistEmpty: "No items yet.",
+      checklistDone: "Done",
       checklistNote: "Description",
       checklistDelete: "Delete",
       addLesson: "Add a lesson",
@@ -1346,102 +1365,115 @@
       return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
     }
 
+    function makeChecklistRow(item) {
+      const li = document.createElement("li");
+      li.className = "checklist-item" + (item.done ? " is-done" : "") + (item.open ? " is-open" : "");
+      li.dataset.id = item.id;
+
+      const main = document.createElement("div");
+      main.className = "checklist-main";
+
+      const check = document.createElement("button");
+      check.type = "button";
+      check.className = "checklist-check";
+      check.setAttribute("aria-checked", item.done ? "true" : "false");
+      check.setAttribute("aria-label", item.done ? "Move back to checklist" : "Move to Done");
+      check.innerHTML = checklistCircle(item.done);
+      check.addEventListener("click", () => {
+        const next = loadChecklistItems().map((row) =>
+          row.id === item.id ? { ...row, done: !row.done, open: false } : row,
+        );
+        // Keep open items first, then Done — so unticked ones land back on top.
+        next.sort((a, b) => Number(a.done) - Number(b.done));
+        saveChecklistItems(next);
+        renderChecklist();
+      });
+
+      const title = document.createElement("input");
+      title.type = "text";
+      title.className = "checklist-title";
+      title.value = item.title;
+      title.setAttribute("aria-label", "Item");
+      title.addEventListener("change", () => {
+        const next = loadChecklistItems().map((row) =>
+          row.id === title.closest(".checklist-item").dataset.id
+            ? { ...row, title: title.value.trim() }
+            : row,
+        );
+        saveChecklistItems(next.filter((row) => row.title || row.description));
+        renderChecklist();
+      });
+      title.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          title.blur();
+        }
+      });
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "checklist-toggle";
+      toggle.setAttribute("aria-expanded", item.open ? "true" : "false");
+      toggle.setAttribute("aria-label", t("checklistNote"));
+      toggle.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.2 2.4L7.8 6 4.2 9.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      toggle.addEventListener("click", () => {
+        const next = loadChecklistItems().map((row) =>
+          row.id === item.id ? { ...row, open: !row.open } : row,
+        );
+        saveChecklistItems(next);
+        renderChecklist();
+        if (!item.open) {
+          const note = document.querySelector(`.checklist-item[data-id="${item.id}"] textarea`);
+          note?.focus();
+        }
+      });
+
+      main.append(check, title, toggle);
+
+      const detail = document.createElement("div");
+      detail.className = "checklist-detail";
+      const note = document.createElement("textarea");
+      note.value = item.description;
+      note.placeholder = t("checklistNote");
+      note.setAttribute("aria-label", t("checklistNote"));
+      note.addEventListener("change", () => {
+        const next = loadChecklistItems().map((row) =>
+          row.id === item.id ? { ...row, description: note.value.trim() } : row,
+        );
+        saveChecklistItems(next);
+      });
+      const actions = document.createElement("div");
+      actions.className = "checklist-actions";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = t("checklistDelete");
+      remove.addEventListener("click", () => {
+        saveChecklistItems(loadChecklistItems().filter((row) => row.id !== item.id));
+        renderChecklist();
+      });
+      actions.append(remove);
+      detail.append(note, actions);
+      li.append(main, detail);
+      return li;
+    }
+
     function renderChecklist() {
       const list = document.querySelector("#checklist");
+      const doneList = document.querySelector("#checklist-done");
+      const doneGroup = document.querySelector("#checklist-done-group");
       const empty = document.querySelector("#checklist-empty");
-      if (!list || !empty) return;
+      if (!list || !doneList || !doneGroup || !empty) return;
       const items = loadChecklistItems();
+      const openItems = items.filter((item) => !item.done);
+      const doneItems = items.filter((item) => item.done);
       list.replaceChildren();
+      doneList.replaceChildren();
+      for (const item of openItems) list.append(makeChecklistRow(item));
+      for (const item of doneItems) doneList.append(makeChecklistRow(item));
       empty.textContent = items.length ? "" : t("checklistEmpty");
-      for (const item of items) {
-        const li = document.createElement("li");
-        li.className = "checklist-item" + (item.done ? " is-done" : "") + (item.open ? " is-open" : "");
-        li.dataset.id = item.id;
-
-        const main = document.createElement("div");
-        main.className = "checklist-main";
-
-        const check = document.createElement("button");
-        check.type = "button";
-        check.className = "checklist-check";
-        check.setAttribute("aria-checked", item.done ? "true" : "false");
-        check.setAttribute("aria-label", item.done ? "Mark incomplete" : "Mark complete");
-        check.innerHTML = checklistCircle(item.done);
-        check.addEventListener("click", () => {
-          const next = loadChecklistItems().map((row) =>
-            row.id === item.id ? { ...row, done: !row.done } : row,
-          );
-          saveChecklistItems(next);
-          renderChecklist();
-        });
-
-        const title = document.createElement("input");
-        title.type = "text";
-        title.className = "checklist-title";
-        title.value = item.title;
-        title.setAttribute("aria-label", "Item");
-        title.addEventListener("change", () => {
-          const next = loadChecklistItems().map((row) =>
-            row.id === title.closest(".checklist-item").dataset.id
-              ? { ...row, title: title.value.trim() }
-              : row,
-          );
-          saveChecklistItems(next.filter((row) => row.title || row.description));
-          renderChecklist();
-        });
-        title.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            title.blur();
-          }
-        });
-
-        const toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.className = "checklist-toggle";
-        toggle.setAttribute("aria-expanded", item.open ? "true" : "false");
-        toggle.setAttribute("aria-label", t("checklistNote"));
-        toggle.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.2 2.4L7.8 6 4.2 9.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        toggle.addEventListener("click", () => {
-          const next = loadChecklistItems().map((row) =>
-            row.id === item.id ? { ...row, open: !row.open } : row,
-          );
-          saveChecklistItems(next);
-          renderChecklist();
-          if (!item.open) {
-            const note = document.querySelector(`.checklist-item[data-id="${item.id}"] textarea`);
-            note?.focus();
-          }
-        });
-
-        main.append(check, title, toggle);
-
-        const detail = document.createElement("div");
-        detail.className = "checklist-detail";
-        const note = document.createElement("textarea");
-        note.value = item.description;
-        note.placeholder = t("checklistNote");
-        note.setAttribute("aria-label", t("checklistNote"));
-        note.addEventListener("change", () => {
-          const next = loadChecklistItems().map((row) =>
-            row.id === item.id ? { ...row, description: note.value.trim() } : row,
-          );
-          saveChecklistItems(next);
-        });
-        const actions = document.createElement("div");
-        actions.className = "checklist-actions";
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.textContent = t("checklistDelete");
-        remove.addEventListener("click", () => {
-          saveChecklistItems(loadChecklistItems().filter((row) => row.id !== item.id));
-          renderChecklist();
-        });
-        actions.append(remove);
-        detail.append(note, actions);
-        li.append(main, detail);
-        list.append(li);
-      }
+      doneGroup.hidden = doneItems.length === 0;
+      const doneLabel = doneGroup.querySelector(".checklist-group-label");
+      if (doneLabel) doneLabel.textContent = t("checklistDone");
     }
 
     document.querySelector("#checklist-new").addEventListener("keydown", (event) => {
