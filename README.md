@@ -50,6 +50,10 @@ These files stay on the machine and are ignored by git:
 
 Python 3.9 is enough. There are no extra packages to install.
 
+## Decisions
+
+Why each model, and how the voice loop is wired: [docs/decisions](docs/decisions).
+
 ## Tests
 
 ```bash
