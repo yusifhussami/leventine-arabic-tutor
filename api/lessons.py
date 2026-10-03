@@ -1,6 +1,14 @@
 from http.server import BaseHTTPRequestHandler
 
-from lexicon.http_api import handle_errors, json_response, read_json, require_user, with_db
+from lexicon.http_api import (
+    handle_errors,
+    json_response,
+    query_param,
+    read_json,
+    require_user,
+    with_db,
+)
+from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.notebook import save_lesson
 from lexicon.prefs import get_language
 
@@ -10,6 +18,21 @@ class handler(BaseHTTPRequestHandler):
         def run():
             user_id = require_user(self)
             body = read_json(self)
+            if query_param(self, "preview") == "1" or body.get("preview"):
+                pairs = parse_lesson_text(body.get("text") or "")
+                json_response(
+                    self,
+                    200,
+                    [
+                        {
+                            "spelling": spelling,
+                            "gloss": gloss,
+                            "kind": item_kind(spelling),
+                        }
+                        for spelling, gloss in pairs
+                    ],
+                )
+                return
 
             def work(conn):
                 return save_lesson(
