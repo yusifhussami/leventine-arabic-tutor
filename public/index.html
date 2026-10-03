@@ -683,6 +683,27 @@
       button.textContent = clerk.user ? "Account" : "Sign in";
     }
 
+    function clerkFrontendHost(publishableKey) {
+      const payload = publishableKey.split("_").slice(2).join("_");
+      const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+      return atob(padded).replace(/\$$/, "");
+    }
+
+    function loadScript(src, attrs = {}) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.crossOrigin = "anonymous";
+        for (const [key, value] of Object.entries(attrs)) {
+          script.setAttribute(key, value);
+        }
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("could not load sign-in"));
+        document.head.append(script);
+      });
+    }
+
     async function bootAuth() {
       let publishableKey = "";
       try {
@@ -700,16 +721,19 @@
         paintAccount();
         return;
       }
-      await new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
-        script.async = true;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("could not load sign-in"));
-        document.head.append(script);
+      const host = clerkFrontendHost(publishableKey);
+      await loadScript(`https://${host}/npm/@clerk/ui@1/dist/ui.browser.js`);
+      await loadScript(`https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`, {
+        "data-clerk-publishable-key": publishableKey,
       });
-      clerk = new window.Clerk(publishableKey);
-      await clerk.load();
+      // CDN script exposes a ready Clerk instance on window, not a constructor.
+      clerk = window.Clerk;
+      if (!clerk?.load) {
+        throw new Error("could not start sign-in");
+      }
+      await clerk.load({
+        ui: { ClerkUI: window.__internal_ClerkUICtor },
+      });
       authReady = true;
       showAuthGate(!clerk.user);
       paintAccount();
@@ -725,12 +749,12 @@
     }
 
     document.querySelector("#sign-in").onclick = () => {
-      if (clerk) clerk.openSignIn();
+      if (clerk) clerk.openSignIn({ forceRedirectUrl: "/" });
     };
     document.querySelector("#account-button").onclick = () => {
       if (!clerk) return;
       if (clerk.user) clerk.openUserProfile();
-      else clerk.openSignIn();
+      else clerk.openSignIn({ forceRedirectUrl: "/" });
     };
 
     function showTab(name) {
