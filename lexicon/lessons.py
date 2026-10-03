@@ -5,6 +5,7 @@ A lesson is every row whose Date Added falls on the same calendar day.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime
 from typing import Literal
@@ -75,6 +76,7 @@ EntryKind = Literal["blank", "reversed", "grammar", "phrase", "word"]
 # Chat-alphabet digits. A 2 or a 7 inside an English example is not, by itself,
 # proof that the columns were swapped.
 _ARABIZI_DIGITS = frozenset("2356789")
+_JAPANESE_SCRIPT = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 
 
 def classify_entry(row: sqlite3.Row) -> EntryKind:
@@ -102,12 +104,15 @@ def classify_entry(row: sqlite3.Row) -> EntryKind:
 
 
 def _is_reversed(word: str, meaning: str) -> bool:
-    """True when the English gloss and the Arabizi spelling traded columns.
+    """True when the English gloss and the target spelling traded columns.
 
     The meaning has to be one token. An English gloss that quotes Arabizi
     later, as in fakker's "ma 2deret afakker", still belongs to a real word.
+    Japanese sheets reverse when English is in Word and kana/kanji is Meaning.
     """
-    return _is_plain_english(word) and _is_arabizi_token(meaning)
+    if not _is_plain_english(word):
+        return False
+    return _is_arabizi_token(meaning) or _is_japanese_token(meaning)
 
 
 def _is_plain_english(text: str) -> bool:
@@ -118,6 +123,12 @@ def _is_arabizi_token(text: str) -> bool:
     if not text or any(ch.isspace() for ch in text):
         return False
     return any(ch in _ARABIZI_DIGITS for ch in text)
+
+
+def _is_japanese_token(text: str) -> bool:
+    if not text:
+        return False
+    return bool(_JAPANESE_SCRIPT.search(text))
 
 
 # These rows name a grammatical idea. A verb glossed "break (imperative)" is

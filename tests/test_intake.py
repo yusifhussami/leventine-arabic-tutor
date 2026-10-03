@@ -7,6 +7,7 @@ from lexicon.intake import parse_lesson_text
 from lexicon.judge import RateLimiter
 from lexicon.load import connect, flag_duplicates, load_entries
 from lexicon.notebook import (
+    _TALK_PACE,
     import_csv,
     import_sheet,
     list_items,
@@ -198,6 +199,7 @@ class NotebookTests(unittest.TestCase):
             pace=RateLimiter(min_interval=0),
         )
         self.assertEqual(reply["arabizi"], "kifak")
+        self.assertLess(_TALK_PACE.min_interval, 1.0)
         with self.assertRaises(ValueError):
             talk(self.conn, [], "test-key", opener, pace=RateLimiter(min_interval=0))
 
@@ -425,6 +427,36 @@ class NotebookTests(unittest.TestCase):
         self.assertEqual(by_day["bas"], "2026-10-03")
         with self.assertRaisesRegex(ValueError, "no new words"):
             import_csv(self.conn, csv_text, embed=embed, default_day="2026-10-03")
+
+    def test_japanese_csv_import_stores_kana_with_kanji_on_the_gloss(self) -> None:
+        def embed(texts: list[str]) -> list[list[float]]:
+            return [[0.0, 1.0] for _ in texts]
+
+        csv_text = (
+            "Kanji,Kana,Meaning\n"
+            "今日は,こんにちは,hello\n"
+            "水,みず,water\n"
+        )
+        saved = import_csv(
+            self.conn,
+            csv_text,
+            embed=embed,
+            default_day="2026-10-03",
+            language="japanese",
+        )
+        self.assertEqual(saved["items"], 2)
+        items = {
+            item["spelling"]: item["gloss"]
+            for item in list_items(self.conn, language="japanese")
+        }
+        self.assertEqual(
+            items,
+            {
+                "こんにちは": "hello · 今日は",
+                "みず": "water · 水",
+            },
+        )
+        self.assertEqual(list_items(self.conn, language="arabic"), [])
 
 
 if __name__ == "__main__":

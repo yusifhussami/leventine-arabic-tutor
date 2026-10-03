@@ -35,16 +35,19 @@ def get_language(conn, user_id: str = LOCAL_USER) -> str:
 
 
 def save_language(conn, language: str, user_id: str = LOCAL_USER) -> str:
+    """Remember the learner's last language choice for this account."""
     raw = (language or "").strip().lower()
     if not raw or (raw not in LANGUAGES and raw not in _ALIASES):
         raise ValueError("language must be arabic or japanese")
     cleaned = normalize_language(raw)
-    with conn:
-        conn.execute(
-            "INSERT INTO settings (user_id, key, value) VALUES (?, 'language', ?) "
-            "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
-            (user_id, cleaned),
-        )
+    # Commit explicitly — `with conn` on the Supabase pooler can drop the
+    # connection before a later read, so the choice looked unsaved.
+    conn.execute(
+        "INSERT INTO settings (user_id, key, value) VALUES (?, 'language', ?) "
+        "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+        (user_id, cleaned),
+    )
+    conn.commit()
     return cleaned
 
 

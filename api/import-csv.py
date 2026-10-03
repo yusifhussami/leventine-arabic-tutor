@@ -2,7 +2,7 @@ from http.server import BaseHTTPRequestHandler
 
 from lexicon.http_api import handle_errors, json_response, read_json, require_user, with_db
 from lexicon.notebook import import_csv
-from lexicon.prefs import get_language
+from lexicon.prefs import get_language, normalize_language
 
 
 class handler(BaseHTTPRequestHandler):
@@ -12,12 +12,15 @@ class handler(BaseHTTPRequestHandler):
             body = read_json(self)
 
             def work(conn):
+                language = normalize_language(
+                    body.get("language") or get_language(conn, user_id)
+                )
                 return import_csv(
                     conn,
                     body.get("csv") or "",
                     user_id=user_id,
                     default_day=body.get("learned_on") or None,
-                    language=get_language(conn, user_id),
+                    language=language,
                 )
 
             json_response(self, 200, with_db(work))

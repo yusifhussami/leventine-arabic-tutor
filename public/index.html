@@ -504,6 +504,159 @@
     #pane-settings .document { max-width: 520px; }
     #pane-settings section + section { margin-top: 36px; }
     #pane-settings h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    #pane-checklist {
+      background: var(--grouped);
+    }
+    #pane-checklist .checklist-shell {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+    #pane-checklist .hint { margin-bottom: 16px; }
+    .checklist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      background: var(--window);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid color-mix(in srgb, var(--separator) 70%, transparent);
+    }
+    .checklist-item {
+      border-bottom: 1px solid var(--separator);
+    }
+    .checklist-item:last-child { border-bottom: 0; }
+    .checklist-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      padding: 10px 12px 10px 14px;
+    }
+    .checklist-check {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border: 0;
+      padding: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--tertiary);
+      display: grid;
+      place-items: center;
+    }
+    .checklist-check svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
+    .checklist-check[aria-checked="true"] { color: var(--switch); }
+    .checklist-title {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      padding: 4px 0;
+      font-size: 17px;
+      font-weight: 400;
+      line-height: 1.25;
+      outline: none;
+    }
+    .checklist-item.is-done .checklist-title {
+      color: var(--secondary);
+      text-decoration: line-through;
+      text-decoration-color: color-mix(in srgb, var(--secondary) 55%, transparent);
+    }
+    .checklist-toggle {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0;
+      background: transparent;
+      color: var(--tertiary);
+      display: grid;
+      place-items: center;
+    }
+    .checklist-toggle:hover { background: var(--fill); color: var(--secondary); }
+    .checklist-toggle svg {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.18s ease;
+    }
+    .checklist-item.is-open .checklist-toggle svg { transform: rotate(90deg); }
+    .checklist-item.is-open .checklist-toggle { color: var(--blue); }
+    .checklist-detail {
+      display: none;
+      padding: 0 14px 14px 50px;
+    }
+    .checklist-item.is-open .checklist-detail { display: block; }
+    .checklist-detail textarea {
+      min-height: 72px;
+      border-radius: 10px;
+      border-color: transparent;
+      background: var(--grouped);
+      font-size: 15px;
+      line-height: 1.4;
+      color: var(--secondary);
+      resize: vertical;
+    }
+    .checklist-detail textarea:focus {
+      border-color: var(--separator);
+      color: var(--label);
+      background: var(--field);
+    }
+    .checklist-detail .checklist-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+    .checklist-detail .checklist-actions button {
+      border: 0;
+      background: transparent;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 4px 2px;
+    }
+    .checklist-composer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      min-height: 48px;
+      padding: 10px 14px;
+      background: var(--window);
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--separator) 70%, transparent);
+    }
+    .checklist-composer .plus {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      flex-shrink: 0;
+    }
+    .checklist-composer .plus svg { width: 18px; height: 18px; }
+    .checklist-composer input {
+      border: 0;
+      background: transparent;
+      padding: 4px 0;
+      font-size: 17px;
+      outline: none;
+    }
+    .checklist-composer input::placeholder { color: var(--tertiary); }
+    .checklist-empty {
+      margin: 18px 2px 0;
+      color: var(--secondary);
+      font-size: 13px;
+    }
+    .checklist-empty:empty { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .checklist-toggle svg { transition: none; }
+    }
     #language-setup .language-picks { margin-top: 12px; }
     #language-setup .language-picks button { color: var(--label); background: var(--fill); }
     #language-setup .language-picks button[aria-pressed="true"] { color: #ffffff; background: var(--blue); }
@@ -573,6 +726,10 @@
         <button class="tab" type="button" data-tab="words">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h6.2A2.8 2.8 0 0 1 14 8.3V19a2.2 2.2 0 0 0-2.2-2.2H5V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 5.5h-6.2A2.8 2.8 0 0 0 10 8.3V19a2.2 2.2 0 0 1 2.2-2.2H19V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
           <span data-i18n="tabWords">Words</span>
+        </button>
+        <button class="tab" type="button" data-tab="checklist">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M8 12.2l2.2 2.2L16 8.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-i18n="tabChecklist">Checklist</span>
         </button>
         <button class="tab" type="button" data-tab="settings">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 13.1a1.4 1.4 0 0 0 .28 1.54l.06.06a1.7 1.7 0 1 1-2.4 2.4l-.06-.06a1.4 1.4 0 0 0-1.54-.28 1.4 1.4 0 0 0-.85 1.28V18a1.7 1.7 0 1 1-3.4 0v-.1a1.4 1.4 0 0 0-.92-1.28 1.4 1.4 0 0 0-1.54.28l-.06.06a1.7 1.7 0 1 1-2.4-2.4l.06-.06a1.4 1.4 0 0 0 .28-1.54 1.4 1.4 0 0 0-1.28-.85H6a1.7 1.7 0 1 1 0-3.4h.1a1.4 1.4 0 0 0 1.28-.92 1.4 1.4 0 0 0-.28-1.54l-.06-.06a1.7 1.7 0 1 1 2.4-2.4l.06.06a1.4 1.4 0 0 0 1.54.28h.08A1.4 1.4 0 0 0 12 4.1V4a1.7 1.7 0 1 1 3.4 0v.1a1.4 1.4 0 0 0 .85 1.28 1.4 1.4 0 0 0 1.54-.28l.06-.06a1.7 1.7 0 1 1 2.4 2.4l-.06.06a1.4 1.4 0 0 0-.28 1.54v.08a1.4 1.4 0 0 0 1.28.85H20a1.7 1.7 0 1 1 0 3.4h-.1a1.4 1.4 0 0 0-1.28.85Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
@@ -700,6 +857,21 @@
           <div id="library"></div>
         </div>
 
+        <div id="pane-checklist" class="pane" hidden>
+          <div class="checklist-shell">
+            <h2 data-i18n="tabChecklist">Checklist</h2>
+            <p class="hint" data-i18n="checklistHint">Light goals for this language. Tap the chevron for a note.</p>
+            <ul id="checklist" class="checklist" aria-label="Checklist"></ul>
+            <div class="checklist-composer">
+              <span class="plus" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 6v12M6 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </span>
+              <input id="checklist-new" type="text" data-i18n-placeholder="checklistNew" placeholder="New item" autocomplete="off">
+            </div>
+            <p id="checklist-empty" class="checklist-empty" data-i18n="checklistEmpty">No items yet.</p>
+          </div>
+        </div>
+
         <div id="pane-settings" class="pane" hidden>
           <div class="document">
             <section id="account-setup">
@@ -752,12 +924,20 @@
       tabToday: "Today",
       tabPractice: "Practice",
       tabWords: "Words",
+      tabChecklist: "Checklist",
       tabSettings: "Settings",
+      checklistHint: "Light goals for this language. Tap the chevron for a note.",
+      checklistNew: "New item",
+      checklistEmpty: "No items yet.",
+      checklistNote: "Description",
+      checklistDelete: "Delete",
       addLesson: "Add a lesson",
       lessonDate: "Date",
       wordsLabel: "Words",
       importCsv: "Import a CSV",
       importHint: "Starting empty? Upload a sheet with Word and Meaning columns. Date Added groups them by lesson day.",
+      importHintJapanese:
+        "Japanese sheet: Kanji, Kana (hiragana/katakana), and Meaning/English. Practice uses kana; kanji stays on the meaning line.",
       chooseCsv: "Choose CSV",
       importWords: "Import words",
       noCsvChosen: "No file chosen",
@@ -833,16 +1013,18 @@
         micLang: "ar-SA",
       },
       japanese: {
-        lessonHint: "Each romaji spelling stays with its English meaning.",
-        pastePlaceholder: "hello - konnichiwa\nthank you - arigatou\nwater = mizu",
-        colArabizi: "Romaji",
+        lessonHint: "Each kana (or romaji) spelling stays with its English meaning.",
+        pastePlaceholder: "hello - こんにちは\nthank you - ありがとう\nwater = みず",
+        colArabizi: "Kana",
         colGloss: "English",
         typeArabizi: "Or type in Japanese or romaji",
-        sentencePlaceholder: "Romaji that uses this word",
+        sentencePlaceholder: "Japanese that uses this word",
         glossAria: "English",
-        arabiziAria: "Romaji",
+        arabiziAria: "Kana",
         speakMissing: "No Japanese script to speak. Type a line, or try again.",
         micLang: "ja-JP",
+        importHint:
+          "Japanese sheet: Kanji, Kana (hiragana/katakana), and Meaning/English. Practice uses kana; kanji stays on the meaning line.",
       },
     };
 
@@ -940,6 +1122,7 @@
         today: "tabToday",
         practice: "tabPractice",
         words: "tabWords",
+        checklist: "tabChecklist",
         settings: "tabSettings",
       };
       document.querySelector("#toolbar-title").textContent = t(titleKeys[activeTab] || "tabToday");
@@ -958,6 +1141,7 @@
         resetTalkForLanguage();
         loadLibrary().catch(() => {});
         loadRecent().catch(() => {});
+        renderChecklist();
       }
     }
 
@@ -1102,11 +1286,12 @@
         today: "tabToday",
         practice: "tabPractice",
         words: "tabWords",
+        checklist: "tabChecklist",
         settings: "tabSettings",
       };
       document.querySelector("#toolbar-title").textContent = t(titleKeys[name] || "tabToday");
       document.querySelector(".search-wrap").hidden = name !== "words";
-      for (const tab of ["today", "practice", "words", "settings"]) {
+      for (const tab of ["today", "practice", "words", "checklist", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -1114,32 +1299,199 @@
         if (active) button.setAttribute("aria-current", "page");
         else button.removeAttribute("aria-current");
       }
+      if (name === "checklist") renderChecklist();
     }
 
+    function checklistStorageKey() {
+      return "checklist:" + learningLanguage;
+    }
+
+    function loadChecklistItems() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(checklistStorageKey()) || "[]");
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .filter((item) => item && typeof item === "object")
+          .map((item) => ({
+            id: String(item.id || crypto.randomUUID()),
+            title: String(item.title || ""),
+            description: String(item.description || ""),
+            done: Boolean(item.done),
+            open: Boolean(item.open),
+          }));
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function saveChecklistItems(items) {
+      localStorage.setItem(
+        checklistStorageKey(),
+        JSON.stringify(
+          items.map(({ id, title, description, done, open }) => ({
+            id,
+            title,
+            description,
+            done,
+            open,
+          })),
+        ),
+      );
+    }
+
+    function checklistCircle(done) {
+      if (done) {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8.2 12.2l2.3 2.3 5.3-5.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
+    }
+
+    function renderChecklist() {
+      const list = document.querySelector("#checklist");
+      const empty = document.querySelector("#checklist-empty");
+      if (!list || !empty) return;
+      const items = loadChecklistItems();
+      list.replaceChildren();
+      empty.textContent = items.length ? "" : t("checklistEmpty");
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.className = "checklist-item" + (item.done ? " is-done" : "") + (item.open ? " is-open" : "");
+        li.dataset.id = item.id;
+
+        const main = document.createElement("div");
+        main.className = "checklist-main";
+
+        const check = document.createElement("button");
+        check.type = "button";
+        check.className = "checklist-check";
+        check.setAttribute("aria-checked", item.done ? "true" : "false");
+        check.setAttribute("aria-label", item.done ? "Mark incomplete" : "Mark complete");
+        check.innerHTML = checklistCircle(item.done);
+        check.addEventListener("click", () => {
+          const next = loadChecklistItems().map((row) =>
+            row.id === item.id ? { ...row, done: !row.done } : row,
+          );
+          saveChecklistItems(next);
+          renderChecklist();
+        });
+
+        const title = document.createElement("input");
+        title.type = "text";
+        title.className = "checklist-title";
+        title.value = item.title;
+        title.setAttribute("aria-label", "Item");
+        title.addEventListener("change", () => {
+          const next = loadChecklistItems().map((row) =>
+            row.id === title.closest(".checklist-item").dataset.id
+              ? { ...row, title: title.value.trim() }
+              : row,
+          );
+          saveChecklistItems(next.filter((row) => row.title || row.description));
+          renderChecklist();
+        });
+        title.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            title.blur();
+          }
+        });
+
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "checklist-toggle";
+        toggle.setAttribute("aria-expanded", item.open ? "true" : "false");
+        toggle.setAttribute("aria-label", t("checklistNote"));
+        toggle.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.2 2.4L7.8 6 4.2 9.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        toggle.addEventListener("click", () => {
+          const next = loadChecklistItems().map((row) =>
+            row.id === item.id ? { ...row, open: !row.open } : row,
+          );
+          saveChecklistItems(next);
+          renderChecklist();
+          if (!item.open) {
+            const note = document.querySelector(`.checklist-item[data-id="${item.id}"] textarea`);
+            note?.focus();
+          }
+        });
+
+        main.append(check, title, toggle);
+
+        const detail = document.createElement("div");
+        detail.className = "checklist-detail";
+        const note = document.createElement("textarea");
+        note.value = item.description;
+        note.placeholder = t("checklistNote");
+        note.setAttribute("aria-label", t("checklistNote"));
+        note.addEventListener("change", () => {
+          const next = loadChecklistItems().map((row) =>
+            row.id === item.id ? { ...row, description: note.value.trim() } : row,
+          );
+          saveChecklistItems(next);
+        });
+        const actions = document.createElement("div");
+        actions.className = "checklist-actions";
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = t("checklistDelete");
+        remove.addEventListener("click", () => {
+          saveChecklistItems(loadChecklistItems().filter((row) => row.id !== item.id));
+          renderChecklist();
+        });
+        actions.append(remove);
+        detail.append(note, actions);
+        li.append(main, detail);
+        list.append(li);
+      }
+    }
+
+    document.querySelector("#checklist-new").addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      const input = event.currentTarget;
+      const title = input.value.trim();
+      if (!title) return;
+      const items = loadChecklistItems();
+      items.push({
+        id: crypto.randomUUID(),
+        title,
+        description: "",
+        done: false,
+        open: false,
+      });
+      saveChecklistItems(items);
+      input.value = "";
+      renderChecklist();
+    });
+
     async function loadLanguage() {
+      // Prefer the account's last saved choice; fall back to this browser.
       try {
         const response = await apiFetch("/api/settings");
         if (!response.ok) {
-          applyLanguage(learningLanguage);
+          applyLanguage(learningLanguage, { reload: true });
           return;
         }
         const payload = await response.json();
-        applyLanguage(payload.language);
+        applyLanguage(payload.language || learningLanguage, { reload: true });
       } catch (err) {
-        applyLanguage(learningLanguage);
+        applyLanguage(learningLanguage, { reload: true });
       }
     }
 
     document.querySelectorAll("[data-language]").forEach((button) => {
       button.addEventListener("click", async () => {
         const language = normalizeLearningLanguage(button.dataset.language);
+        const previous = learningLanguage;
         const error = document.querySelector("#language-error");
         error.textContent = "";
+        // Save immediately in the browser, then on the account.
         applyLanguage(language, { animate: true, reload: true });
         try {
-          await post("/api/settings", { language });
+          const saved = await post("/api/settings", { language });
+          applyLanguage(saved.language || language, { reload: false });
         } catch (err) {
-          error.textContent = err.message;
+          error.textContent = err.message || "Could not save language.";
+          applyLanguage(previous, { reload: true });
         }
       });
     });
@@ -1325,6 +1677,7 @@
         const saved = await post("/api/import-csv", {
           csv: pendingCsvText,
           learned_on: learnedOn.value,
+          language: learningLanguage,
         });
         clearCsvPick();
         error.className = "error note";
@@ -1587,20 +1940,7 @@
       return /[\u0600-\u06FF]/.test(text || "");
     }
 
-    async function speakReply(text) {
-      if (!hasSpeechScript(text)) {
-        throw new Error(t("speakMissing"));
-      }
-      const response = await apiFetch("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, language: learningLanguage }),
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || t("speakFailed"));
-      }
-      const blob = await response.blob();
+    async function playWavBlob(blob) {
       const url = URL.createObjectURL(blob);
       player.src = url;
       try {
@@ -1619,6 +1959,83 @@
           resolve();
         };
       });
+    }
+
+    async function playWavBase64(b64) {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      await playWavBlob(new Blob([bytes], { type: "audio/wav" }));
+    }
+
+    async function speakReply(text) {
+      if (!hasSpeechScript(text)) {
+        throw new Error(t("speakMissing"));
+      }
+      const response = await apiFetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, language: learningLanguage }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || t("speakFailed"));
+      }
+      await playWavBlob(await response.blob());
+    }
+
+    async function postTalk(body, onReply) {
+      const response = await apiFetch("/api/talk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, speak: true }),
+      });
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "request failed");
+      }
+      if (!contentType.includes("ndjson")) {
+        const reply = await response.json();
+        onReply?.(reply);
+        if (reply.arabic) await speakReply(reply.arabic);
+        else throw new Error(t("speakMissing"));
+        return reply;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let reply = null;
+      let heard = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, cut).trim();
+          buffer = buffer.slice(cut + 1);
+          if (!line) continue;
+          const obj = JSON.parse(line);
+          if (reply === null) {
+            reply = obj;
+            onReply?.(reply);
+            continue;
+          }
+          if (obj.error && !obj.audio_wav_base64) {
+            throw new Error(obj.error || t("speakFailed"));
+          }
+          if (!obj.audio_wav_base64) throw new Error(t("speakMissing"));
+          await playWavBase64(obj.audio_wav_base64);
+          heard = true;
+        }
+      }
+      if (!reply) throw new Error("request failed");
+      if (!heard) {
+        if (reply.arabic) await speakReply(reply.arabic);
+        else throw new Error(t("speakMissing"));
+      }
+      return reply;
     }
 
     function setTalkLabel(text) {
@@ -1666,19 +2083,22 @@
       const error = document.querySelector("#talk-error");
       error.textContent = "";
       try {
-        const reply = await post("/api/talk", {
-          scene,
-          start: false,
-          language: learningLanguage,
-          turns: [{ role: "user", text: t("startScene") }],
-        });
+        await postTalk(
+          {
+            scene,
+            start: false,
+            language: learningLanguage,
+            turns: [{ role: "user", text: t("startScene") }],
+          },
+          (reply) => {
+            if (!conversing) return;
+            assertReplyMatchesLearning(reply);
+            appendTurn(t("sawt"), reply.arabizi, reply.english);
+            talkLog.push({ role: "assistant", text: reply.arabizi });
+            showVoiceLine(reply.arabizi, reply.english);
+          },
+        );
         if (!conversing) return;
-        assertReplyMatchesLearning(reply);
-        appendTurn(t("sawt"), reply.arabizi, reply.english);
-        talkLog.push({ role: "assistant", text: reply.arabizi });
-        showVoiceLine(reply.arabizi, reply.english);
-        if (reply.arabic) await speakReply(reply.arabic);
-        else error.textContent = t("speakMissing");
       } catch (err) {
         error.textContent = err.message;
         conversing = false;
@@ -1818,35 +2238,34 @@
       talkLog.push({ role: "user", text: said });
       setTalkLabel("Speaking");
       try {
-        const reply = await post("/api/talk", {
-          turns: talkLog.slice(-6),
-          scene,
-          language: learningLanguage,
-        });
-        if (!conversing) return;
-        assertReplyMatchesLearning(reply);
-        const spokeNative =
-          learningLanguage === "japanese" && isJapaneseText(said);
-        // Keep native-script input in history so the next turns still understand them.
-        talkLog[talkLog.length - 1].text = spokeNative ? said : (reply.you_arabizi || said);
-        if (spokeNative) {
-          // Show what they said, with romaji underneath.
-          appendTurn(t("you"), said, reply.you_arabizi || reply.you_english);
-        } else {
-          appendTurn(t("you"), reply.you_arabizi || said, reply.you_english);
-        }
-        const note = [
-          reply.correction,
-          reply.better && (!spokeNative || reply.better !== reply.you_arabizi) && (t("tryPrefix") + reply.better),
-        ].filter(Boolean).join(" ");
-        appendTurn(t("sawt"), reply.arabizi, reply.english, note);
-        showVoiceLine(reply.arabizi, reply.english);
-        talkLog.push({ role: "assistant", text: reply.arabizi });
-        if (reply.arabic) {
-          await speakReply(reply.arabic);
-        } else {
-          error.textContent = t("speakMissing");
-        }
+        await postTalk(
+          {
+            turns: talkLog.slice(-6),
+            scene,
+            language: learningLanguage,
+          },
+          (reply) => {
+            if (!conversing) return;
+            assertReplyMatchesLearning(reply);
+            const spokeNative =
+              learningLanguage === "japanese" && isJapaneseText(said);
+            // Keep native-script input in history so the next turns still understand them.
+            talkLog[talkLog.length - 1].text = spokeNative ? said : (reply.you_arabizi || said);
+            if (spokeNative) {
+              // Show what they said, with romaji underneath.
+              appendTurn(t("you"), said, reply.you_arabizi || reply.you_english);
+            } else {
+              appendTurn(t("you"), reply.you_arabizi || said, reply.you_english);
+            }
+            const note = [
+              reply.correction,
+              reply.better && (!spokeNative || reply.better !== reply.you_arabizi) && (t("tryPrefix") + reply.better),
+            ].filter(Boolean).join(" ");
+            appendTurn(t("sawt"), reply.arabizi, reply.english, note);
+            showVoiceLine(reply.arabizi, reply.english);
+            talkLog.push({ role: "assistant", text: reply.arabizi });
+          },
+        );
       } catch (err) {
         error.textContent = err.message;
         talkLog.pop();
@@ -1855,7 +2274,7 @@
         setTalkLabel("Talk");
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, 300));
       if (conversing) startTalk();
       else setTalkLabel("Talk");
     }
@@ -1877,7 +2296,7 @@
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      const waitForPause = () => {
+      const waitForPause = (ms) => {
         clearTimeout(pauseTimer);
         pauseTimer = setTimeout(() => {
           const line = (pending + draft).trim();
@@ -1888,17 +2307,23 @@
           listening = null;
           if (current) current.stop();
           sendTalk(line);
-        }, 1800);
+        }, ms);
       };
       recognition.onresult = (event) => {
         draft = "";
+        let sawFinal = false;
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const piece = event.results[i][0].transcript;
-          if (event.results[i].isFinal) pending += piece + " ";
-          else draft += piece;
+          if (event.results[i].isFinal) {
+            pending += piece + " ";
+            sawFinal = true;
+          } else {
+            draft += piece;
+          }
         }
         if ((pending + draft).trim()) {
-          waitForPause();
+          // Final chunks can send sooner; keep a little hang for interim speech.
+          waitForPause(!draft.trim() && sawFinal ? 700 : 1100);
           showVoiceLine((pending + draft).trim(), "");
         }
       };

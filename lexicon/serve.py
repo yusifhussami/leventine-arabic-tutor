@@ -24,7 +24,7 @@ from lexicon.notebook import (
     update_item,
 )
 from lexicon.prefs import get_language, normalize_language, save_language
-from lexicon.speak import speak_text
+from lexicon.speak import speak_text, speech_stream_payload
 
 PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
 if not PAGE.exists():
@@ -146,12 +146,15 @@ class NotebookHandler(BaseHTTPRequestHandler):
             if path == "/api/import-csv":
                 conn = _db()
                 try:
+                    language = normalize_language(
+                        body.get("language") or get_language(conn, LOCAL_USER)
+                    )
                     saved = import_csv(
                         conn,
                         body.get("csv") or "",
                         user_id=LOCAL_USER,
                         default_day=body.get("learned_on") or None,
-                        language=get_language(conn, LOCAL_USER),
+                        language=language,
                     )
                 finally:
                     conn.close()
@@ -163,16 +166,32 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     language = normalize_language(
                         body.get("language") or get_language(conn, LOCAL_USER)
                     )
+                    key = read_api_key()
                     reply = talk(
                         conn,
                         body.get("turns") or [],
-                        read_api_key(),
+                        key,
                         scene=body.get("scene") or "",
                         user_id=LOCAL_USER,
                         language=language,
                     )
                 finally:
                     conn.close()
+                if body.get("speak"):
+                    # Reply line first (page paints), then TTS on the same request.
+                    self._ndjson_begin(200)
+                    self._ndjson_line(reply)
+                    if reply.get("arabic"):
+                        self._ndjson_line(
+                            speech_stream_payload(
+                                reply["arabic"], key, language=language
+                            )
+                        )
+                    else:
+                        self._ndjson_line(
+                            {"audio_wav_base64": "", "error": "nothing to say"}
+                        )
+                    return
                 self._json(200, reply)
                 return
             if path == "/api/speak":
@@ -247,6 +266,19 @@ class NotebookHandler(BaseHTTPRequestHandler):
     def _json(self, status: int, payload) -> None:
         body = json.dumps(payload).encode()
         self._bytes(status, body, "application/json")
+
+    def _ndjson_begin(self, status: int) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+    def _ndjson_line(self, payload) -> None:
+        self.wfile.write((json.dumps(payload) + "\n").encode())
+        try:
+            self.wfile.flush()
+        except Exception:
+            pass
 
     def _bytes(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)

@@ -13,7 +13,7 @@ python3 -m lexicon.serve
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is required for that local server.
 
 - **Today** is where a lesson gets pasted. Arabic: `baza5 = fancy` or `practice - tadreeb`. Japanese: `hello - konnichiwa` or `mizu = water` (romaji). Preview shows the split before you save.
-- **Settings** (under Words) has account sign-in and **Language you’re learning** (Levantine Arabic or Japanese). UI stays English; mic, TTS, spellings, and your word list follow the choice — each language has its own notebook on the account. If the notebook is empty, **Import a CSV** accepts a sheet with Word and Meaning columns (Arabizi/Romaji and English/Gloss work too). Date Added groups rows by lesson day; rows without a date use the lesson date field.
+- **Settings** (under Words) has account sign-in and **Language you’re learning** (Levantine Arabic or Japanese). UI stays English; mic, TTS, spellings, and your word list follow the choice — each language has its own notebook on the account. **Import a CSV** on Today: Arabic sheets use Word/Arabizi + Meaning; Japanese sheets use Kanji + Kana (hiragana/katakana) + Meaning — practice stores kana, with kanji kept on the meaning line. Date Added groups rows by lesson day; rows without a date use the lesson date field.
 - **Words** lists everything saved, grouped by the lesson date. Edit changes the Latin spelling or the meaning. A spelling with a space is stored as a phrase.
 - **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance.
 

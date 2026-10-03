@@ -13,7 +13,7 @@ Everything paid goes through one OpenRouter key. The browser never sees the key.
 1. Build a prompt that includes the saved words (or the practice card) and the learner line.
 2. POST `https://openrouter.ai/api/v1/chat/completions` with a strict JSON schema (`response_format`).
 3. Parse the schema fields in Python. Judgment fields: `uses_target`, `fits_meaning`, `comment`. Talk fields: `you_arabizi`, `you_english`, `arabic`, `arabizi`, `english`, `correction`, `better`.
-4. Space calls by about 4 seconds so a burst stays under the minute cap. Retry 408 / 429 / 5xx a few times.
+4. Space sentence-check calls by about 4 seconds so a typed burst stays under the minute cap. Talk uses its own ~0.25 s gap so voice turns are not stuck waiting. Retry 408 / 429 / 5xx a few times.
 
 Talk also caps `max_tokens` at 280 so a turn stays short and cheap.
 

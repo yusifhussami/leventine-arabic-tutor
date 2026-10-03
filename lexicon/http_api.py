@@ -33,6 +33,22 @@ def bytes_response(handler, status: int, body: bytes, content_type: str) -> None
     handler.wfile.write(body)
 
 
+def ndjson_begin(handler, status: int = 200) -> None:
+    """Start a streamed talk+speech response (reply line, then audio line)."""
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/x-ndjson")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.end_headers()
+
+
+def ndjson_line(handler, payload) -> None:
+    handler.wfile.write((json.dumps(payload) + "\n").encode())
+    try:
+        handler.wfile.flush()
+    except Exception:
+        pass
+
+
 def read_json(handler) -> dict:
     length = int(handler.headers.get("Content-Length", "0") or "0")
     raw = handler.rfile.read(length) if length else b"{}"

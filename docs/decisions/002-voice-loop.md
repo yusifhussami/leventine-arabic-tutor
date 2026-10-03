@@ -11,10 +11,10 @@ I wanted a real conversation that stays cheap. A realtime voice API would keep a
 ## How it runs
 
 1. Practice shows the orb. Tap starts listening (or a Situation starts with Sawt’s first line).
-2. Recognition is continuous with interim results. A reply only fires after about 1.8 seconds of silence, so the bot does not cut me off mid-sentence.
-3. The page POSTs the last few turns to `/api/talk`. The server builds the prompt, calls Flash Lite, and returns Arabizi, English, Arabic script, and optional correction / better line.
-4. The page shows my line as Arabizi + English (not Arabic script). Sawt’s line is Arabizi + English. If there is a correction, it shows under that turn.
-5. The page POSTs the Arabic script to `/api/speak`, plays the WAV, waits about 700 ms so the mic does not hear Sawt, then listens again.
+2. Recognition is continuous with interim results. A final chunk can send after about 0.7 s of quiet; interim speech waits about 1.1 s, so the bot does not cut me off mid-sentence.
+3. The page POSTs the last few turns to `/api/talk` with `speak: true`. The server builds the prompt, calls Flash Lite, streams the text reply as NDJSON, then runs Flash Lite TTS on the same request.
+4. The page paints my line and Sawt’s line as soon as the first NDJSON line arrives (Arabizi + English; correction under the turn when present).
+5. The second NDJSON line is the WAV (base64). The page plays it, waits about 300 ms so the mic does not hear Sawt, then listens again. `/api/speak` remains for fallback.
 
 Typing on the same page uses the same `/api/talk` and `/api/speak` path. It just skips the mic.
 

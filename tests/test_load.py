@@ -71,8 +71,24 @@ class LoadTests(unittest.TestCase):
         self.assertEqual(rows[0]["meaning"], "how are you")
         self.assertEqual(rows[0]["date_added"], "")
 
+    def test_parse_japanese_csv_prefers_kana_and_keeps_kanji(self) -> None:
+        rows = parse_vocabulary_csv(
+            "Kanji,Hiragana,English\n"
+            "今日は,こんにちは,hello\n"
+            "水,みず,water\n"
+            ",ありがとう,thank you\n"
+        )
+        self.assertEqual(
+            [(row["word"], row["meaning"]) for row in rows],
+            [
+                ("こんにちは", "hello · 今日は"),
+                ("みず", "water · 水"),
+                ("ありがとう", "thank you"),
+            ],
+        )
+
     def test_parse_rejects_csv_without_meaning_column(self) -> None:
-        with self.assertRaisesRegex(ValueError, "Word column and a Meaning column"):
+        with self.assertRaisesRegex(ValueError, "spelling and meaning columns"):
             parse_vocabulary_csv("Word,Status\nbas,Unmarked\n")
 
 

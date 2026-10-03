@@ -1,7 +1,15 @@
+import base64
 import json
 import unittest
 
-from lexicon.speak import MODEL, VOICE, arabic_for_speech, arabic_speech, text_for_speech
+from lexicon.speak import (
+    MODEL,
+    VOICE,
+    arabic_for_speech,
+    arabic_speech,
+    speech_stream_payload,
+    text_for_speech,
+)
 
 
 class _Audio:
@@ -56,3 +64,17 @@ class SpeakTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             text_for_speech("مرحبا", "japanese")
         self.assertEqual(text_for_speech("  こんにちは hello  ", "japanese"), "こんにちは")
+
+    def test_speech_stream_payload_is_base64_wav(self) -> None:
+        def opener(request, timeout):
+            return _Audio(b"\x00\x00" * 8)
+
+        payload = speech_stream_payload("مرحبا", "test-key", opener=opener)
+        raw = base64.b64decode(payload["audio_wav_base64"])
+        self.assertEqual(raw[:4], b"RIFF")
+        self.assertNotIn("error", payload)
+
+    def test_speech_stream_payload_reports_blank_input(self) -> None:
+        payload = speech_stream_payload("   ", "test-key", opener=lambda *args: None)
+        self.assertEqual(payload["audio_wav_base64"], "")
+        self.assertIn("nothing to say", payload["error"])

@@ -7,6 +7,7 @@ Arabic letters for Levantine, kana/kanji for Japanese — never bare Latin.
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import urllib.error
@@ -68,6 +69,20 @@ def _script_for_speech(text: str, language: str) -> str:
 def arabic_speech(text: str, api_key: str, opener=urllib.request.urlopen) -> bytes:
     """Return wav bytes for Arabic. Prefer speak_text for learning-language aware calls."""
     return speak_text(text, api_key, language="arabic", opener=opener)
+
+
+def speech_stream_payload(
+    text: str,
+    api_key: str,
+    language: str = "arabic",
+    opener=urllib.request.urlopen,
+) -> dict:
+    """Second NDJSON line for /api/talk with speak=true — base64 wav or an error."""
+    try:
+        audio = speak_text(text, api_key, language=language, opener=opener)
+    except (ValueError, RuntimeError) as exc:
+        return {"audio_wav_base64": "", "error": str(exc)}
+    return {"audio_wav_base64": base64.b64encode(audio).decode("ascii")}
 
 
 def speak_text(

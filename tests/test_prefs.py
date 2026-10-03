@@ -30,6 +30,14 @@ class PrefsTests(unittest.TestCase):
         self.assertEqual(save_language(self.conn, "arabic"), "arabic")
         self.assertEqual(get_language(self.conn), "arabic")
 
+    def test_last_saved_language_wins(self) -> None:
+        save_language(self.conn, "arabic")
+        save_language(self.conn, "japanese")
+        save_language(self.conn, "arabic")
+        self.assertEqual(get_language(self.conn), "arabic")
+        save_language(self.conn, "japanese")
+        self.assertEqual(get_language(self.conn), "japanese")
+
     def test_legacy_aliases_still_work(self) -> None:
         self.assertEqual(save_language(self.conn, "ja"), "japanese")
         self.assertEqual(get_language(self.conn), "japanese")

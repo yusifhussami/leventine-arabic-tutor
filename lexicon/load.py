@@ -11,6 +11,7 @@ import argparse
 import csv
 import io
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -23,11 +24,29 @@ REQUIRED_COLUMNS = {
     "Status",
 }
 
-_WORD_HEADERS = frozenset({"word", "arabizi", "romaji", "spelling", "latin"})
+_WORD_HEADERS = frozenset(
+    {"word", "arabizi", "romaji", "spelling", "latin", "expression", "term", "vocab"}
+)
+_KANA_HEADERS = frozenset(
+    {
+        "kana",
+        "hiragana",
+        "katakana",
+        "reading",
+        "読み",
+        "よみ",
+        "ふりがな",
+        "furigana",
+        "pronunciation",
+        "yomigana",
+    }
+)
+_KANJI_HEADERS = frozenset({"kanji", "漢字", "japanese", "日本語", "汉字", "漢字表記"})
 _MEANING_HEADERS = frozenset(
-    {"meaning", "english", "gloss", "japanese", "日本語", "translation"}
+    {"meaning", "english", "gloss", "translation", "definition", "英語", "意味"}
 )
 _DATE_HEADERS = frozenset({"date added", "date", "learned on", "learned_on", "day"})
+_JAPANESE_SCRIPT = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS entries (
@@ -221,7 +240,11 @@ def _header_map(fieldnames: list[str] | None) -> dict[str, str]:
     found: dict[str, str] = {}
     for name in fieldnames or []:
         key = " ".join((name or "").strip().casefold().split())
-        if key in _WORD_HEADERS and "word" not in found:
+        if key in _KANA_HEADERS and "kana" not in found:
+            found["kana"] = name
+        elif key in _KANJI_HEADERS and "kanji" not in found:
+            found["kanji"] = name
+        elif key in _WORD_HEADERS and "word" not in found:
             found["word"] = name
         elif key in _MEANING_HEADERS and "meaning" not in found:
             found["meaning"] = name
@@ -236,30 +259,63 @@ def _header_map(fieldnames: list[str] | None) -> dict[str, str]:
     return found
 
 
+def _japanese_csv_fields(row: dict, columns: dict[str, str]) -> tuple[str, str]:
+    """Pick primary spelling + gloss for a Japanese-style CSV row.
+
+    Prefer hiragana/katakana as the spelling used in Practice. Keep kanji on
+    the gloss line so the learner still sees it: `hello · 今日は`.
+    """
+    kana = (row.get(columns["kana"]) or "").strip() if "kana" in columns else ""
+    kanji = (row.get(columns["kanji"]) or "").strip() if "kanji" in columns else ""
+    word = (row.get(columns["word"]) or "").strip() if "word" in columns else ""
+    meaning = (row.get(columns["meaning"]) or "").strip() if "meaning" in columns else ""
+
+    # A generic Word column that is already Japanese script can stand in for kanji.
+    if not kanji and word and _JAPANESE_SCRIPT.search(word):
+        kanji = word
+        word = ""
+
+    spelling = kana or kanji or word
+    gloss = meaning
+    if kana and kanji and kana != kanji:
+        gloss = f"{meaning} · {kanji}" if meaning else kanji
+    elif not gloss and kanji and spelling != kanji:
+        gloss = kanji
+    return spelling, gloss
+
+
 def parse_vocabulary_csv(text: str) -> list[dict]:
     """Read a vocabulary CSV from text into row dicts for notebook import.
 
-    Needs a spelling column (Word / Arabizi / Romaji / Spelling) and a meaning
-    column (Meaning / English / Gloss). Date Added is optional. Extra Notion
-    columns are kept when present.
+    Arabic sheets need Word/Arabizi/Romaji + Meaning/English.
+    Japanese sheets may use Kanji + Kana/Hiragana/Katakana/Reading + Meaning.
+    Kana becomes the stored spelling; kanji is kept on the meaning line.
     """
     if text is None or not str(text).strip():
         raise ValueError("CSV is empty")
     handle = io.StringIO(str(text).lstrip("\ufeff"))
     reader = csv.DictReader(handle)
     columns = _header_map(reader.fieldnames)
-    if "word" not in columns or "meaning" not in columns:
+    japanese_sheet = "kana" in columns or "kanji" in columns
+    has_spelling = "word" in columns or "kana" in columns or "kanji" in columns
+    if not has_spelling or "meaning" not in columns:
         raise ValueError(
-            "CSV needs a Word column and a Meaning column "
-            "(Arabizi/Romaji/Spelling and English/Gloss also work)"
+            "CSV needs spelling and meaning columns. "
+            "Arabic: Word/Arabizi + English. "
+            "Japanese: Kanji + Kana/Hiragana/Reading + Meaning/English."
         )
     rows: list[dict] = []
     for source_row, row in enumerate(reader, start=1):
+        if japanese_sheet:
+            word, meaning = _japanese_csv_fields(row, columns)
+        else:
+            word = row.get(columns["word"]) or ""
+            meaning = row.get(columns["meaning"]) or ""
         rows.append(
             {
                 "source_row": source_row,
-                "word": row.get(columns["word"]) or "",
-                "meaning": row.get(columns["meaning"]) or "",
+                "word": word,
+                "meaning": meaning,
                 "date_added": (row.get(columns["date"]) or "").strip()
                 if "date" in columns
                 else "",

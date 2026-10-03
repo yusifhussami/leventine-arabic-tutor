@@ -35,6 +35,9 @@ from lexicon.speak import text_for_speech
 EMBED_MODEL = "openai/text-embedding-3-small"
 EMBED_URL = "https://openrouter.ai/api/v1/embeddings"
 _EMBED_PACE = RateLimiter()
+# Voice turns need to fire as soon as the model is free. Sentence checks keep the
+# slower shared gap in judge.py; Talk uses its own short pace.
+_TALK_PACE = RateLimiter(min_interval=0.25)
 _IMPORT_MARK = "imported from vocabulary.csv"
 _BATCH = 64
 
@@ -778,6 +781,8 @@ def talk(
     )
     if opener is None:
         opener = urllib.request.urlopen
+    if pace is None:
+        pace = _TALK_PACE
     data = _talk_model_json(prompt, api_key, opener, pace)
     if _talk_reply_off_language(data, learning):
         repair = (
