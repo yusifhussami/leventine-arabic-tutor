@@ -89,13 +89,14 @@ CREATE TABLE IF NOT EXISTS judgments (
 CREATE TABLE IF NOT EXISTS lessons (
     id INTEGER PRIMARY KEY,
     user_id TEXT NOT NULL DEFAULT 'local',
+    language TEXT NOT NULL DEFAULT 'arabic',
     learned_on TEXT NOT NULL,
     raw_text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_lessons_user
-    ON lessons (user_id, learned_on DESC, id DESC);
+    ON lessons (user_id, language, learned_on DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS lesson_items (
     id INTEGER PRIMARY KEY,
@@ -159,11 +160,19 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
 
 
 def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
-    """Add user_id columns for older local databases."""
+    """Add user_id / language columns for older local databases."""
     lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
     if lesson_cols and "user_id" not in lesson_cols:
         conn.execute("ALTER TABLE lessons ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'")
         conn.commit()
+    lesson_cols = {row[1] for row in conn.execute("PRAGMA table_info(lessons)")}
+    if lesson_cols and "language" not in lesson_cols:
+        conn.execute("ALTER TABLE lessons ADD COLUMN language TEXT NOT NULL DEFAULT 'arabic'")
+        conn.commit()
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
+        "ON lessons (user_id, language, learned_on DESC, id DESC)"
+    )
     setting_cols = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
     if setting_cols and "user_id" not in setting_cols:
         conn.executescript(
@@ -181,6 +190,7 @@ def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
             """
         )
         conn.commit()
+    conn.commit()
 
 
 def normalize_word(word: str) -> str:

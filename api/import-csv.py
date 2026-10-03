@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 
 from lexicon.http_api import handle_errors, json_response, read_json, require_user, with_db
 from lexicon.notebook import import_csv
+from lexicon.prefs import get_language
 
 
 class handler(BaseHTTPRequestHandler):
@@ -16,6 +17,7 @@ class handler(BaseHTTPRequestHandler):
                     body.get("csv") or "",
                     user_id=user_id,
                     default_day=body.get("learned_on") or None,
+                    language=get_language(conn, user_id),
                 )
 
             json_response(self, 200, with_db(work))

@@ -1,8 +1,8 @@
-"""Turn an Arabic reply into a wav the browser can play.
+"""Turn a reply into a wav the browser can play.
 
 Gemini Flash Lite TTS returns PCM on OpenRouter. The wav wrapper is what
-phones and other browsers can play from the response. Input must be Arabic
-script so Japanese-account romaji never gets read aloud as Latin letters.
+phones and other browsers can play. Script must match the learning language:
+Arabic letters for Levantine, kana/kanji for Japanese — never bare Latin.
 """
 
 from __future__ import annotations
@@ -14,40 +14,70 @@ import urllib.request
 import wave
 from io import BytesIO
 
+from lexicon.prefs import normalize_language
+
 SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech"
 MODEL = "google/gemini-3.8-flash-lite-tts"
 VOICE = "Kore"
 SAMPLE_RATE = 24000
 
-# Arabic letters and marks only. Romaji / kana / kanji must not reach the voice.
 _ARABIC = re.compile(
     r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]"
 )
-_KEEP = re.compile(
+_ARABIC_KEEP = re.compile(
     r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF"
     r"\s\.\,\!\?؟،؛\-]"
+)
+_JAPANESE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
+_JAPANESE_KEEP = re.compile(
+    r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff"
+    r"\s\.\,\!\?？、。\-]"
 )
 
 
 def arabic_for_speech(text: str) -> str:
     """Keep only Arabic script (and light punctuation) for TTS."""
+    return _script_for_speech(text, "arabic")
+
+
+def text_for_speech(text: str, language: str = "arabic") -> str:
+    """Keep only the learning language's script for TTS."""
+    return _script_for_speech(text, language)
+
+
+def _script_for_speech(text: str, language: str) -> str:
     line = " ".join((text or "").split())
     if not line:
         raise ValueError("nothing to say")
-    if not _ARABIC.search(line):
-        raise ValueError("speech needs Arabic script")
-    cleaned = "".join(ch if _KEEP.match(ch) else " " for ch in line)
+    lang = normalize_language(language)
+    if lang == "japanese":
+        needle, keep, label = _JAPANESE, _JAPANESE_KEEP, "Japanese"
+    else:
+        needle, keep, label = _ARABIC, _ARABIC_KEEP, "Arabic"
+    if not needle.search(line):
+        raise ValueError(f"speech needs {label} script")
+    cleaned = "".join(ch if keep.match(ch) else " " for ch in line)
     cleaned = " ".join(cleaned.split())
-    if not cleaned or not _ARABIC.search(cleaned):
-        raise ValueError("speech needs Arabic script")
+    if not cleaned or not needle.search(cleaned):
+        raise ValueError(f"speech needs {label} script")
     if len(cleaned) > 400:
         cleaned = cleaned[:400]
     return cleaned
 
 
 def arabic_speech(text: str, api_key: str, opener=urllib.request.urlopen) -> bytes:
-    """Return wav bytes. The key goes in a header, not the URL."""
-    line = arabic_for_speech(text)
+    """Return wav bytes for Arabic. Prefer speak_text for learning-language aware calls."""
+    return speak_text(text, api_key, language="arabic", opener=opener)
+
+
+def speak_text(
+    text: str,
+    api_key: str,
+    language: str = "arabic",
+    opener=urllib.request.urlopen,
+) -> bytes:
+    """Return wav bytes for the learning language. The key goes in a header."""
+    line = text_for_speech(text, language)
     request = urllib.request.Request(
         SPEECH_URL,
         data=json.dumps(

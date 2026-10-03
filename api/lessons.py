@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 
 from lexicon.http_api import handle_errors, json_response, read_json, require_user, with_db
 from lexicon.notebook import save_lesson
+from lexicon.prefs import get_language
 
 
 class handler(BaseHTTPRequestHandler):
@@ -16,6 +17,7 @@ class handler(BaseHTTPRequestHandler):
                     body["learned_on"],
                     body.get("text") or "",
                     user_id=user_id,
+                    language=get_language(conn, user_id),
                 )
 
             json_response(self, 200, with_db(work))

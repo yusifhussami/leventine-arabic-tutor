@@ -79,8 +79,26 @@
     }
     .app-name {
       margin: 2px 8px 16px;
-      font-size: 13px;
+      font-size: 17px;
       font-weight: 650;
+      line-height: 1.1;
+      perspective: 240px;
+    }
+    .app-name .brand-mark {
+      display: inline-block;
+      transform-origin: center center;
+    }
+    .app-name.brand-switch .brand-mark {
+      animation: brand-flip 0.42s ease;
+    }
+    @keyframes brand-flip {
+      0% { opacity: 1; transform: rotateX(0deg) scale(1); }
+      45% { opacity: 0; transform: rotateX(88deg) scale(0.88); }
+      55% { opacity: 0; transform: rotateX(-88deg) scale(0.88); }
+      100% { opacity: 1; transform: rotateX(0deg) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app-name.brand-switch .brand-mark { animation: none; }
     }
     .sidebar-label {
       margin: 0 8px 4px;
@@ -534,14 +552,14 @@
 <body>
   <div id="auth-gate" class="auth-gate" hidden>
     <div>
-      <h2>Sawt</h2>
+      <h2 class="gate-brand"><span class="brand-mark">صوت</span></h2>
       <p>Sign in to keep your words and practice on your own account.</p>
       <button id="sign-in" class="primary" type="button">Sign in</button>
     </div>
   </div>
   <div class="window">
     <aside class="sidebar">
-      <p class="app-name">Sawt</p>
+      <p class="app-name" id="app-brand" aria-label="Sawt"><span class="brand-mark">صوت</span></p>
       <p class="sidebar-label">Notebook</p>
       <nav aria-label="Sections">
         <button class="tab active" type="button" data-tab="today" aria-current="page">
@@ -692,11 +710,11 @@
               </div>
             </section>
             <section id="language-setup">
-              <h2 data-i18n="language">Language</h2>
-              <p class="hint" data-i18n="languageHint">English: speak Arabizi. Japanese: speak Japanese — Sawt answers in Levantine Arabic.</p>
-              <div class="scenes language-picks" role="group" aria-label="Language">
-                <button type="button" class="secondary" data-language="en" aria-pressed="true">English</button>
-                <button type="button" class="secondary" data-language="ja" aria-pressed="false">日本語</button>
+              <h2 data-i18n="language">Language you're learning</h2>
+              <p class="hint" data-i18n="languageHint">The app stays in English. Pick the language you practice: speaking, listening, and spellings follow that choice.</p>
+              <div class="scenes language-picks" role="group" aria-label="Language you're learning">
+                <button type="button" class="secondary" data-language="arabic" aria-pressed="true">Levantine Arabic</button>
+                <button type="button" class="secondary" data-language="japanese" aria-pressed="false">Japanese</button>
               </div>
               <p id="language-error" class="error"></p>
             </section>
@@ -716,173 +734,189 @@
     let currentId = null;
     let clerk = null;
     let authReady = false;
-    let uiLanguage = localStorage.getItem("language") === "ja" ? "ja" : "en";
+    let learningLanguage = normalizeLearningLanguage(localStorage.getItem("language"));
     let pendingCsvText = "";
 
-    const I18N = {
-      en: {
-        tabToday: "Today",
-        tabPractice: "Practice",
-        tabWords: "Words",
-        tabSettings: "Settings",
-        addLesson: "Add a lesson",
+    function normalizeLearningLanguage(value) {
+      const raw = (value || "").toLowerCase();
+      if (raw === "japanese" || raw === "ja" || raw === "romaji") return "japanese";
+      return "arabic";
+    }
+
+    function brandMark(language) {
+      return normalizeLearningLanguage(language) === "japanese" ? "音" : "صوت";
+    }
+
+    // App chrome stays English. A few labels follow the language being learned.
+    const UI = {
+      tabToday: "Today",
+      tabPractice: "Practice",
+      tabWords: "Words",
+      tabSettings: "Settings",
+      addLesson: "Add a lesson",
+      lessonDate: "Date",
+      wordsLabel: "Words",
+      importCsv: "Import a CSV",
+      importHint: "Starting empty? Upload a sheet with Word and Meaning columns. Date Added groups them by lesson day.",
+      chooseCsv: "Choose CSV",
+      importWords: "Import words",
+      noCsvChosen: "No file chosen",
+      importDone: (days, items) =>
+        items === 1
+          ? "Imported 1 word."
+          : "Imported " + items + " words across " + days + " lesson day" + (days === 1 ? "." : "s."),
+      emptyLibrary: "No lessons saved yet.",
+      emptyLibraryHint: "Paste a lesson on Today, or import a CSV there.",
+      preview: "Preview",
+      saveLesson: "Save lesson",
+      nextLesson: "Next lesson",
+      lookingUpLesson: "Looking up your next Arabic lesson.",
+      account: "Account",
+      accountHint: "Sign in to keep your words on your account.",
+      accountLocal: "This local notebook does not need a sign-in.",
+      signedIn: "Signed in",
+      signIn: "Sign in",
+      manageAccount: "Manage account",
+      language: "Language you're learning",
+      calendar: "Calendar",
+      calendarHint: "Paste the secret iCal address from Google Calendar.",
+      icalLink: "iCal link",
+      saveCalendar: "Save calendar",
+      tapToTalk: "Tap to talk",
+      talk: "Talk",
+      listening: "Listening",
+      speaking: "Speaking",
+      sceneCoffee: "Coffee",
+      sceneRestaurant: "Restaurant",
+      sceneShop: "Shop",
+      sceneTaxi: "Taxi",
+      library: "Library",
+      chooseWord: "Choose a saved word, then write one sentence that uses it.",
+      writeWith: "Write with",
+      yourSentence: "Your sentence",
+      checkSentence: "Check sentence",
+      search: "Search",
+      connectCalendar: "Connect Google Calendar to see your next Arabic lesson.",
+      noLesson: "No upcoming Preply lesson on that calendar.",
+      calendarReadError: "Could not read the calendar.",
+      wordCount: (n) => (n === 1 ? "1 word" : n + " words"),
+      edit: "Edit",
+      save: "Save",
+      cancel: "Cancel",
+      usesTarget: "uses the target",
+      missesTarget: "does not use the target",
+      fitsMeaning: "fits the meaning",
+      missesMeaning: "does not fit the meaning",
+      tryPrefix: "Try: ",
+      you: "You",
+      sawt: "Sawt",
+      noSpeech: "This browser has no speech recognition. Type a line instead.",
+      micDenied: "Allow the microphone, then tap the circle.",
+      speakFailed: "Could not play speech.",
+      speakMissing: "Nothing to speak. Type a line, or try again.",
+      startScene: "Start. You speak first, in the place, one short line.",
+      languageHint:
+        "The app stays in English. Pick the language you practice: speaking, listening, and spellings follow that choice.",
+    };
+
+    const MODE = {
+      arabic: {
         lessonHint: "Each Arabizi spelling stays with its English meaning.",
-        lessonDate: "Date",
-        wordsLabel: "Words",
         pastePlaceholder: "practice - tadreeb\nto train - etdarrab\n8ararat = decisions",
-        importCsv: "Import a CSV",
-        importHint: "Starting empty? Upload a sheet with Word and Meaning columns. Date Added groups them by lesson day.",
-        chooseCsv: "Choose CSV",
-        importWords: "Import words",
-        noCsvChosen: "No file chosen",
-        importDone: (days, items) =>
-          items === 1
-            ? "Imported 1 word."
-            : "Imported " + items + " words across " + days + " lesson day" + (days === 1 ? "." : "s."),
-        emptyLibrary: "No lessons saved yet.",
-        emptyLibraryHint: "Paste a lesson on Today, or import a CSV there.",
-        preview: "Preview",
-        saveLesson: "Save lesson",
         colArabizi: "Arabizi",
         colGloss: "English",
-        nextLesson: "Next lesson",
-        lookingUpLesson: "Looking up your next Arabic lesson.",
-        account: "Account",
-        accountHint: "Sign in to keep your words on your account.",
-        accountLocal: "This local notebook does not need a sign-in.",
-        signedIn: "Signed in",
-        signIn: "Sign in",
-        manageAccount: "Manage account",
-        language: "Language",
-        languageHint: "English: speak Arabizi. Japanese: speak Japanese — Sawt answers in Levantine Arabic.",
-        calendar: "Calendar",
-        calendarHint: "Paste the secret iCal address from Google Calendar.",
-        icalLink: "iCal link",
-        saveCalendar: "Save calendar",
-        tapToTalk: "Tap to talk",
-        talk: "Talk",
-        listening: "Listening",
-        speaking: "Speaking",
-        sceneCoffee: "Coffee",
-        sceneRestaurant: "Restaurant",
-        sceneShop: "Shop",
-        sceneTaxi: "Taxi",
         typeArabizi: "Or type in Arabizi",
-        library: "Library",
-        chooseWord: "Choose a saved word, then write one sentence that uses it.",
-        writeWith: "Write with",
-        yourSentence: "Your sentence",
         sentencePlaceholder: "Arabizi that uses this word",
-        checkSentence: "Check sentence",
-        search: "Search",
-        connectCalendar: "Connect Google Calendar to see your next Arabic lesson.",
-        noLesson: "No upcoming Preply lesson on that calendar.",
-        calendarReadError: "Could not read the calendar.",
-        wordCount: (n) => (n === 1 ? "1 word" : n + " words"),
-        edit: "Edit",
-        save: "Save",
-        cancel: "Cancel",
-        usesTarget: "uses the target",
-        missesTarget: "does not use the target",
-        fitsMeaning: "fits the meaning",
-        missesMeaning: "does not fit the meaning",
-        tryPrefix: "Try: ",
-        you: "You",
-        sawt: "Sawt",
-        noSpeech: "This browser has no speech recognition. Type a line instead.",
-        micDenied: "Allow the microphone, then tap the circle.",
-        speakFailed: "Could not play Arabic speech.",
-        speakMissing: "No Arabic script to speak. Type a line, or try again.",
         glossAria: "English",
         arabiziAria: "Arabizi",
-        startScene: "Start. You speak first, in the place, one short line.",
+        speakMissing: "No Arabic script to speak. Type a line, or try again.",
+        micLang: "ar-SA",
       },
-      ja: {
-        tabToday: "今日",
-        tabPractice: "練習",
-        tabWords: "単語",
-        tabSettings: "設定",
-        addLesson: "レッスンを追加",
-        lessonHint: "ローマ字の綴りを日本語の意味と一緒に保存します。話すアラビア語はそのままです。",
-        lessonDate: "日付",
-        wordsLabel: "単語",
-        pastePlaceholder: "練習 - tadreeb\n訓練する - etdarrab\nqararat = 決定",
-        importCsv: "CSVを取り込む",
-        importHint: "単語がまだないときは、Word と Meaning 列のあるCSVをアップロードできます。Date Added があればレッスン日ごとに分かれます。",
-        chooseCsv: "CSVを選ぶ",
-        importWords: "単語を取り込む",
-        noCsvChosen: "ファイル未選択",
-        importDone: (days, items) =>
-          items + "語を" + days + "日分のレッスンとして取り込みました。",
-        emptyLibrary: "まだレッスンがありません。",
-        emptyLibraryHint: "「今日」で貼り付けるか、CSVを取り込んでください。",
-        preview: "プレビュー",
-        saveLesson: "レッスンを保存",
-        colArabizi: "ローマ字",
-        colGloss: "日本語",
-        nextLesson: "次のレッスン",
-        lookingUpLesson: "次のアラビア語レッスンを確認しています。",
-        account: "アカウント",
-        accountHint: "サインインすると、単語を自分のアカウントに保存できます。",
-        accountLocal: "このローカルノートはサインイン不要です。",
-        signedIn: "サインイン済み",
-        signIn: "サインイン",
-        manageAccount: "アカウントを管理",
-        language: "言語",
-        languageHint: "日本語で話してください。Sawtはレバント・アラビア語で答え、画面にローマ字も出します。",
-        calendar: "カレンダー",
-        calendarHint: "Googleカレンダーの非公開iCalアドレスを貼ってください。",
-        icalLink: "iCalリンク",
-        saveCalendar: "カレンダーを保存",
-        tapToTalk: "タップして話す",
-        talk: "話す",
-        listening: "聞いています",
-        speaking: "話しています",
-        sceneCoffee: "カフェ",
-        sceneRestaurant: "レストラン",
-        sceneShop: "お店",
-        sceneTaxi: "タクシー",
-        typeArabizi: "日本語またはローマ字で入力",
-        library: "ライブラリ",
-        chooseWord: "保存した単語を選び、それを使う一文を書いてください。",
-        writeWith: "これで書く",
-        yourSentence: "あなたの文",
-        sentencePlaceholder: "この単語を使うローマ字",
-        checkSentence: "文をチェック",
-        search: "検索",
-        connectCalendar: "Googleカレンダーを接続すると次のアラビア語レッスンが表示されます。",
-        noLesson: "このカレンダーに今後のPreplyレッスンはありません。",
-        calendarReadError: "カレンダーを読めませんでした。",
-        wordCount: (n) => n + "語",
-        edit: "編集",
-        save: "保存",
-        cancel: "キャンセル",
-        usesTarget: "目標語を使っている",
-        missesTarget: "目標語を使っていない",
-        fitsMeaning: "意味に合っている",
-        missesMeaning: "意味に合っていない",
-        tryPrefix: "アラビア語では: ",
-        you: "あなた",
-        sawt: "Sawt",
-        noSpeech: "音声認識が使えません。下の枠に日本語かローマ字で入力してください。",
-        micDenied: "マイクを許可してから、もう一度円をタップしてください。",
-        speakFailed: "アラビア語の音声を再生できませんでした。",
-        speakMissing: "読み上げ用のアラビア文字がありません。もう一度話するか入力してください。",
-        glossAria: "日本語",
-        arabiziAria: "ローマ字",
-        startScene: "Start. You speak first, in the place, one short line.",
+      japanese: {
+        lessonHint: "Each romaji spelling stays with its English meaning.",
+        pastePlaceholder: "hello - konnichiwa\nthank you - arigatou\nwater = mizu",
+        colArabizi: "Romaji",
+        colGloss: "English",
+        typeArabizi: "Or type in Japanese or romaji",
+        sentencePlaceholder: "Romaji that uses this word",
+        glossAria: "English",
+        arabiziAria: "Romaji",
+        speakMissing: "No Japanese script to speak. Type a line, or try again.",
+        micLang: "ja-JP",
       },
     };
 
     function t(key) {
-      const table = I18N[uiLanguage] || I18N.en;
-      return table[key] ?? I18N.en[key] ?? key;
+      const mode = MODE[learningLanguage] || MODE.arabic;
+      return mode[key] ?? UI[key] ?? key;
     }
 
-    function applyLanguage(language) {
-      uiLanguage = language === "ja" ? "ja" : "en";
-      localStorage.setItem("language", uiLanguage);
-      document.documentElement.lang = uiLanguage === "ja" ? "ja" : "en";
+    function setBrandMark(language, { animate = false } = {}) {
+      const next = brandMark(language);
+      const nodes = document.querySelectorAll("#app-brand .brand-mark, .gate-brand .brand-mark");
+      const brand = document.querySelector("#app-brand");
+      const current = brand?.querySelector(".brand-mark")?.textContent || "";
+      if (!animate || current === next || !brand) {
+        nodes.forEach((node) => { node.textContent = next; });
+        return;
+      }
+      brand.classList.remove("brand-switch");
+      void brand.offsetWidth;
+      brand.classList.add("brand-switch");
+      window.setTimeout(() => {
+        nodes.forEach((node) => { node.textContent = next; });
+      }, 180);
+      brand.addEventListener(
+        "animationend",
+        () => brand.classList.remove("brand-switch"),
+        { once: true },
+      );
+    }
+
+    function micLocale() {
+      return learningLanguage === "japanese" ? "ja-JP" : "ar-SA";
+    }
+
+    function resetTalkForLanguage() {
+      const current = listening;
+      listening = null;
+      if (current) {
+        try { current.stop(); } catch (err) {}
+      }
+      player.pause();
+      talkLog.length = 0;
+      draft = "";
+      pending = "";
+      conversing = false;
+      voicePhase = "idle";
+      scene = "";
+      if (pauseTimer) {
+        clearTimeout(pauseTimer);
+        pauseTimer = null;
+      }
+      currentId = null;
+      const line = document.querySelector("#voice-line");
+      const gloss = document.querySelector("#voice-gloss");
+      if (line) line.textContent = "";
+      if (gloss) gloss.textContent = "";
+      const state = document.querySelector("#voice-state");
+      if (state) state.textContent = "Talk";
+      const chat = document.querySelector("#talk-log");
+      if (chat) chat.innerHTML = "";
+      const err = document.querySelector("#talk-error");
+      if (err) err.textContent = "";
+      document.querySelectorAll("[data-scene]").forEach((button) => {
+        button.setAttribute("aria-pressed", "false");
+      });
+    }
+
+    function applyLanguage(language, { animate = false, reload = false } = {}) {
+      const next = normalizeLearningLanguage(language);
+      const changed = next !== learningLanguage;
+      learningLanguage = next;
+      localStorage.setItem("language", learningLanguage);
+      document.documentElement.lang = "en";
+      setBrandMark(learningLanguage, { animate: animate && changed });
       document.querySelectorAll("[data-i18n]").forEach((node) => {
         const value = t(node.dataset.i18n);
         if (typeof value === "string") node.textContent = value;
@@ -896,7 +930,10 @@
         if (typeof value === "string") node.setAttribute("aria-label", value);
       });
       document.querySelectorAll("[data-language]").forEach((button) => {
-        button.setAttribute("aria-pressed", button.dataset.language === uiLanguage ? "true" : "false");
+        button.setAttribute(
+          "aria-pressed",
+          button.dataset.language === learningLanguage ? "true" : "false",
+        );
       });
       const activeTab = document.querySelector(".tab.active")?.dataset.tab || "today";
       const titleKeys = {
@@ -910,14 +947,40 @@
       else if (voicePhase === "listening") setTalkLabel("Listening");
       else if (voicePhase === "speaking") setTalkLabel("Speaking");
       const typed = document.querySelector("#talk-typed");
-      if (typed) typed.lang = uiLanguage === "ja" ? "ja" : "en";
+      if (typed) {
+        typed.lang = learningLanguage === "japanese" ? "ja" : "ar";
+        typed.setAttribute("lang", typed.lang);
+      }
       const csvName = document.querySelector("#csv-file-name");
       if (csvName && !pendingCsvText) csvName.textContent = t("noCsvChosen");
       paintAccount();
+      if (changed && reload) {
+        resetTalkForLanguage();
+        loadLibrary().catch(() => {});
+        loadRecent().catch(() => {});
+      }
     }
 
     function isJapaneseText(text) {
       return /[\u3040-\u30ff\u3400-\u9fff]/.test(text || "");
+    }
+
+    function looksLikeLevantine(text) {
+      const line = text || "";
+      if (/[2356789]/.test(line)) return true;
+      if (/[\u0600-\u06FF]/.test(line)) return true;
+      return /\b(keefak|kifak|ahlan|ahla|mar7aba|marhaba|ahwe|baddi|feek|yalla|habibi|shukran)\b/i.test(line);
+    }
+
+    function assertReplyMatchesLearning(reply) {
+      if (learningLanguage !== "japanese") return;
+      const blob = [reply.arabizi, reply.arabic, reply.better, reply.correction].join(" ");
+      if (looksLikeLevantine(blob)) {
+        throw new Error("Got Arabic instead of Japanese — tap talk again");
+      }
+      if (reply.arabizi && !isJapaneseText(reply.arabic || "")) {
+        throw new Error(t("speakMissing"));
+      }
     }
 
     async function authHeaders(extra = {}) {
@@ -1057,22 +1120,22 @@
       try {
         const response = await apiFetch("/api/settings");
         if (!response.ok) {
-          applyLanguage(uiLanguage);
+          applyLanguage(learningLanguage);
           return;
         }
         const payload = await response.json();
-        applyLanguage(payload.language === "ja" ? "ja" : "en");
+        applyLanguage(payload.language);
       } catch (err) {
-        applyLanguage(uiLanguage);
+        applyLanguage(learningLanguage);
       }
     }
 
     document.querySelectorAll("[data-language]").forEach((button) => {
       button.addEventListener("click", async () => {
-        const language = button.dataset.language === "ja" ? "ja" : "en";
+        const language = normalizeLearningLanguage(button.dataset.language);
         const error = document.querySelector("#language-error");
         error.textContent = "";
-        applyLanguage(language);
+        applyLanguage(language, { animate: true, reload: true });
         try {
           await post("/api/settings", { language });
         } catch (err) {
@@ -1086,7 +1149,7 @@
     });
 
     function localeTag() {
-      return uiLanguage === "ja" ? "ja-JP" : undefined;
+      return "en";
     }
 
     function formatLesson(iso) {
@@ -1487,6 +1550,7 @@
         const result = await post("/api/practice", {
           item_id: currentId,
           sentence: document.querySelector("#sentence").value,
+          language: learningLanguage,
         });
         const used = result.uses_target ? t("usesTarget") : t("missesTarget");
         const fit = result.fits_meaning ? t("fitsMeaning") : t("missesMeaning");
@@ -1516,14 +1580,21 @@
       player.play().catch(() => {});
     }
 
-    async function speakArabic(text) {
-      if (!text || !/[\u0600-\u06FF]/.test(text)) {
+    function hasSpeechScript(text) {
+      if (learningLanguage === "japanese") {
+        return /[\u3040-\u30ff\u3400-\u9fff]/.test(text || "");
+      }
+      return /[\u0600-\u06FF]/.test(text || "");
+    }
+
+    async function speakReply(text) {
+      if (!hasSpeechScript(text)) {
         throw new Error(t("speakMissing"));
       }
       const response = await apiFetch("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, language: learningLanguage }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -1595,12 +1666,19 @@
       const error = document.querySelector("#talk-error");
       error.textContent = "";
       try {
-        const reply = await post("/api/talk", { scene, start: false, turns: [{ role: "user", text: t("startScene") }] });
+        const reply = await post("/api/talk", {
+          scene,
+          start: false,
+          language: learningLanguage,
+          turns: [{ role: "user", text: t("startScene") }],
+        });
         if (!conversing) return;
+        assertReplyMatchesLearning(reply);
         appendTurn(t("sawt"), reply.arabizi, reply.english);
         talkLog.push({ role: "assistant", text: reply.arabizi });
         showVoiceLine(reply.arabizi, reply.english);
-        await speakArabic(reply.arabic);
+        if (reply.arabic) await speakReply(reply.arabic);
+        else error.textContent = t("speakMissing");
       } catch (err) {
         error.textContent = err.message;
         conversing = false;
@@ -1740,25 +1818,35 @@
       talkLog.push({ role: "user", text: said });
       setTalkLabel("Speaking");
       try {
-        const reply = await post("/api/talk", { turns: talkLog.slice(-6), scene });
+        const reply = await post("/api/talk", {
+          turns: talkLog.slice(-6),
+          scene,
+          language: learningLanguage,
+        });
         if (!conversing) return;
-        const spokeJapanese = uiLanguage === "ja" && isJapaneseText(said);
-        // Keep Japanese in the history so the next turns still understand them.
-        talkLog[talkLog.length - 1].text = spokeJapanese ? said : (reply.you_arabizi || said);
-        if (spokeJapanese) {
-          // Show what they said in Japanese, with Levantine romaji underneath.
+        assertReplyMatchesLearning(reply);
+        const spokeNative =
+          learningLanguage === "japanese" && isJapaneseText(said);
+        // Keep native-script input in history so the next turns still understand them.
+        talkLog[talkLog.length - 1].text = spokeNative ? said : (reply.you_arabizi || said);
+        if (spokeNative) {
+          // Show what they said, with romaji underneath.
           appendTurn(t("you"), said, reply.you_arabizi || reply.you_english);
         } else {
           appendTurn(t("you"), reply.you_arabizi || said, reply.you_english);
         }
         const note = [
           reply.correction,
-          reply.better && (!spokeJapanese || reply.better !== reply.you_arabizi) && (t("tryPrefix") + reply.better),
+          reply.better && (!spokeNative || reply.better !== reply.you_arabizi) && (t("tryPrefix") + reply.better),
         ].filter(Boolean).join(" ");
         appendTurn(t("sawt"), reply.arabizi, reply.english, note);
         showVoiceLine(reply.arabizi, reply.english);
         talkLog.push({ role: "assistant", text: reply.arabizi });
-        await speakArabic(reply.arabic);
+        if (reply.arabic) {
+          await speakReply(reply.arabic);
+        } else {
+          error.textContent = t("speakMissing");
+        }
       } catch (err) {
         error.textContent = err.message;
         talkLog.pop();
@@ -1784,8 +1872,8 @@
       }
       if (listening) return;
       const recognition = new Speech();
-      // Japanese accounts speak Japanese; English accounts speak Arabic / Arabizi.
-      recognition.lang = uiLanguage === "ja" ? "ja-JP" : "ar-SA";
+      // Match the learning language: Japanese listens in ja-JP, Arabic in ar-SA.
+      recognition.lang = micLocale();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
@@ -1881,7 +1969,7 @@
 
     localStorage.removeItem("appearance");
 
-    applyLanguage(uiLanguage);
+    applyLanguage(learningLanguage);
     runMotion();
     document.querySelector("#search").addEventListener("input", () => loadLibrary());
     bootAuth().then(() => {

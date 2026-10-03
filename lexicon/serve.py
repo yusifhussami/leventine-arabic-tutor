@@ -23,8 +23,8 @@ from lexicon.notebook import (
     talk,
     update_item,
 )
-from lexicon.prefs import get_language, save_language
-from lexicon.speak import arabic_speech
+from lexicon.prefs import get_language, normalize_language, save_language
+from lexicon.speak import speak_text
 
 PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
 if not PAGE.exists():
@@ -66,13 +66,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
         if path == "/api/items":
             conn = open_db(DB_PATH)
             try:
-                drop_exact_duplicates(conn, LOCAL_USER)
+                language = get_language(conn, LOCAL_USER)
+                drop_exact_duplicates(conn, LOCAL_USER, language=language)
                 query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
                 self._json(
                     200,
-                    search_items(conn, query, user_id=LOCAL_USER)
+                    search_items(conn, query, user_id=LOCAL_USER, language=language)
                     if query.strip()
-                    else list_items(conn, user_id=LOCAL_USER),
+                    else list_items(conn, user_id=LOCAL_USER, language=language),
                 )
             finally:
                 conn.close()
@@ -127,7 +128,11 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 conn = open_db(DB_PATH)
                 try:
                     saved = save_lesson(
-                        conn, body["learned_on"], body.get("text") or "", user_id=LOCAL_USER
+                        conn,
+                        body["learned_on"],
+                        body.get("text") or "",
+                        user_id=LOCAL_USER,
+                        language=get_language(conn, LOCAL_USER),
                     )
                 finally:
                     conn.close()
@@ -141,6 +146,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                         body.get("csv") or "",
                         user_id=LOCAL_USER,
                         default_day=body.get("learned_on") or None,
+                        language=get_language(conn, LOCAL_USER),
                     )
                 finally:
                     conn.close()
@@ -149,30 +155,42 @@ class NotebookHandler(BaseHTTPRequestHandler):
             if path == "/api/talk":
                 conn = open_db(DB_PATH)
                 try:
+                    language = normalize_language(
+                        body.get("language") or get_language(conn, LOCAL_USER)
+                    )
                     reply = talk(
                         conn,
                         body.get("turns") or [],
                         read_api_key(),
                         scene=body.get("scene") or "",
                         user_id=LOCAL_USER,
+                        language=language,
                     )
                 finally:
                     conn.close()
                 self._json(200, reply)
                 return
             if path == "/api/speak":
-                audio = arabic_speech(body.get("text") or "", read_api_key())
+                audio = speak_text(
+                    body.get("text") or "",
+                    read_api_key(),
+                    language=normalize_language(body.get("language")),
+                )
                 self._bytes(200, audio, "audio/wav")
                 return
             if path == "/api/practice":
                 conn = open_db(DB_PATH)
                 try:
+                    language = normalize_language(
+                        body.get("language") or get_language(conn, LOCAL_USER)
+                    )
                     result = judge_saved_item(
                         conn,
                         int(body["item_id"]),
                         body.get("sentence") or "",
                         read_api_key(),
                         user_id=LOCAL_USER,
+                        language=language,
                     )
                 finally:
                     conn.close()

@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from lexicon.speak import MODEL, VOICE, arabic_for_speech, arabic_speech
+from lexicon.speak import MODEL, VOICE, arabic_for_speech, arabic_speech, text_for_speech
 
 
 class _Audio:
@@ -43,9 +43,16 @@ class SpeakTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             arabic_speech("   ", "test-key", lambda *args: None)
 
-    def test_romaji_and_japanese_never_reach_tts(self) -> None:
+    def test_romaji_never_reaches_arabic_tts(self) -> None:
         with self.assertRaises(ValueError):
             arabic_for_speech("marhaba")
         with self.assertRaises(ValueError):
             arabic_for_speech("こんにちは")
         self.assertEqual(arabic_for_speech("  مرحبا keefak  "), "مرحبا")
+
+    def test_japanese_tts_keeps_kana_and_rejects_latin(self) -> None:
+        with self.assertRaises(ValueError):
+            text_for_speech("konnichiwa", "japanese")
+        with self.assertRaises(ValueError):
+            text_for_speech("مرحبا", "japanese")
+        self.assertEqual(text_for_speech("  こんにちは hello  ", "japanese"), "こんにちは")

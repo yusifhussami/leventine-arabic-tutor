@@ -1,8 +1,8 @@
 # Sawt
 
-Sawt is the notebook I use between Levantine lessons. After class I paste the new words with their meanings. Before the next class I talk with those words, or write a sentence with one of them. English accounts use Arabizi and speak Arabic into the mic. Japanese accounts use romaji on the page, speak Japanese into the mic, and still hear Levantine Arabic back.
+Sawt is a practice notebook. After class you paste new words with meanings. Before the next class you talk with those words, or write a sentence with one of them. The app UI stays English. In Settings you choose the language you’re learning — Levantine Arabic (Arabizi, Arabic speech) or Japanese (romaji, Japanese speech).
 
-Locally it runs on this computer with SQLite. On Vercel each person signs in, and their words live in Postgres. Sentence checks, Talk replies, and spoken Arabic go to OpenRouter.
+Locally it runs on this computer with SQLite. On Vercel each person signs in, and their words live in Postgres. Sentence checks, Talk replies, and speech go to OpenRouter.
 
 ## Use it locally
 
@@ -12,12 +12,12 @@ python3 -m lexicon.serve
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is required for that local server.
 
-- **Today** is where a lesson gets pasted. English: `baza5 = fancy` or `practice - tadreeb`. Japanese: `qararat = 決定` or `練習 - tadreeb` (romaji, no digit letters). Preview shows the split before you save.
-- **Settings** (under Words) has account sign-in and the English / 日本語 language switch. If the notebook is empty, **Import a CSV** accepts a sheet with Word and Meaning columns (Arabizi/Romaji and English/Gloss work too). Date Added groups rows by lesson day; rows without a date use the lesson date field.
+- **Today** is where a lesson gets pasted. Arabic: `baza5 = fancy` or `practice - tadreeb`. Japanese: `hello - konnichiwa` or `mizu = water` (romaji). Preview shows the split before you save.
+- **Settings** (under Words) has account sign-in and **Language you’re learning** (Levantine Arabic or Japanese). UI stays English; mic, TTS, spellings, and your word list follow the choice — each language has its own notebook on the account. If the notebook is empty, **Import a CSV** accepts a sheet with Word and Meaning columns (Arabizi/Romaji and English/Gloss work too). Date Added groups rows by lesson day; rows without a date use the lesson date field.
 - **Words** lists everything saved, grouped by the lesson date. Edit changes the Latin spelling or the meaning. A spelling with a space is stored as a phrase.
-- **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance. The mic and TTS stay Arabic.
+- **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance.
 
-Arabizi digits (English accounts): 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Japanese romaji uses letters instead (`h` ح, `q` ق, `kh` خ, `'` ء/ع). Long ee and oo stay as ee and oo. كيفك is keefak.
+Arabizi digits (Arabic): 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Long ee and oo stay as ee and oo. كيفك is keefak. Japanese mode uses Hepburn romaji on the page and Japanese script for speech.
 
 The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the database. It is not printed on the page and it is not included in errors.
 
@@ -56,7 +56,7 @@ Copy `.env.example` to `.env` for local values. On Vercel, set the same names in
 | Call | Model |
 | --- | --- |
 | Sentence check and Talk | `google/gemini-3.5-flash-lite` |
-| Spoken Arabic | `google/gemini-3.8-flash-lite-tts` |
+| Speech (TTS) | `google/gemini-3.8-flash-lite-tts` |
 
 | Name | What it holds |
 | --- | --- |

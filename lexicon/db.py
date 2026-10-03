@@ -14,11 +14,12 @@ PG_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lessons (
     id BIGSERIAL PRIMARY KEY,
     user_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'arabic',
     learned_on TEXT NOT NULL,
     raw_text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_lessons_user ON lessons (user_id, learned_on DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_lessons_user ON lessons (user_id, language, learned_on DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS lesson_items (
     id BIGSERIAL PRIMARY KEY,
@@ -128,6 +129,13 @@ def open_postgres(url: str) -> PgConnection:
             text = statement.strip()
             if text:
                 wrapped.execute(text)
+        wrapped.execute(
+            "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'arabic'"
+        )
+        wrapped.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
+            "ON lessons (user_id, language, learned_on DESC, id DESC)"
+        )
         wrapped.commit()
     except Exception:
         wrapped.close()

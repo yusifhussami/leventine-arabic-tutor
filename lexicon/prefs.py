@@ -1,31 +1,44 @@
-"""Account language: metalanguage + Latin spelling system.
+"""Language the learner is studying: Levantine Arabic or Japanese.
 
-English accounts use Arabizi (digit letters). Japanese accounts use romaji.
-Arabic script for TTS and mic language stay Arabic either way.
+The app UI stays English. Mic, TTS, talk prompts, and Latin spelling follow
+the learning language.
 """
 
 from __future__ import annotations
 
 from lexicon.db import LOCAL_USER
 
-LANGUAGES = frozenset({"en", "ja"})
-DEFAULT_LANGUAGE = "en"
+LANGUAGES = frozenset({"arabic", "japanese"})
+DEFAULT_LANGUAGE = "arabic"
+_ALIASES = {
+    "en": "arabic",
+    "ja": "japanese",
+    "arabizi": "arabic",
+    "romaji": "japanese",
+    "levantine": "arabic",
+}
+
+
+def normalize_language(value: str | None) -> str:
+    cleaned = (value or "").strip().lower()
+    cleaned = _ALIASES.get(cleaned, cleaned)
+    return cleaned if cleaned in LANGUAGES else DEFAULT_LANGUAGE
 
 
 def get_language(conn, user_id: str = LOCAL_USER) -> str:
-    """Account language: English (Arabizi) or Japanese (romaji). Never Arabic."""
+    """Language being learned: arabic or japanese."""
     row = conn.execute(
         "SELECT value FROM settings WHERE user_id = ? AND key = 'language'",
         (user_id,),
     ).fetchone()
-    value = ((row["value"] if row else "") or DEFAULT_LANGUAGE).strip().lower()
-    return value if value in LANGUAGES else DEFAULT_LANGUAGE
+    return normalize_language(row["value"] if row else DEFAULT_LANGUAGE)
 
 
 def save_language(conn, language: str, user_id: str = LOCAL_USER) -> str:
-    cleaned = (language or "").strip().lower()
-    if cleaned not in LANGUAGES:
-        raise ValueError("language must be en or ja")
+    raw = (language or "").strip().lower()
+    if not raw or (raw not in LANGUAGES and raw not in _ALIASES):
+        raise ValueError("language must be arabic or japanese")
+    cleaned = normalize_language(raw)
     with conn:
         conn.execute(
             "INSERT INTO settings (user_id, key, value) VALUES (?, 'language', ?) "
@@ -35,14 +48,22 @@ def save_language(conn, language: str, user_id: str = LOCAL_USER) -> str:
     return cleaned
 
 
-def metalanguage_label(language: str) -> str:
-    return "Japanese" if language == "ja" else "English"
+def learning_label(language: str) -> str:
+    return "Japanese" if normalize_language(language) == "japanese" else "Levantine Arabic"
 
 
 def writing_system(language: str) -> str:
-    """Latin spelling system tied to the account language."""
-    return "romaji" if language == "ja" else "arabizi"
+    """Latin spelling on the page for the learning language."""
+    return "romaji" if normalize_language(language) == "japanese" else "arabizi"
 
 
 def writing_system_label(language: str) -> str:
-    return "romaji" if language == "ja" else "Arabizi"
+    return "romaji" if normalize_language(language) == "japanese" else "Arabizi"
+
+
+def mic_locale(language: str) -> str:
+    return "ja-JP" if normalize_language(language) == "japanese" else "ar-SA"
+
+
+def speech_script_label(language: str) -> str:
+    return "Japanese" if normalize_language(language) == "japanese" else "Arabic"

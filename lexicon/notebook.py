@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import urllib.request
 from datetime import datetime, timezone
 
@@ -22,14 +23,14 @@ from lexicon.load import normalize_meaning, normalize_word, parse_vocabulary_csv
 from lexicon.lessons import parse_date_added
 from lexicon.practice import PracticeCard, PracticeSession, _oriented
 from lexicon.prefs import (
-    DEFAULT_LANGUAGE,
     get_language,
-    metalanguage_label,
-    writing_system,
+    learning_label,
+    normalize_language,
+    speech_script_label,
     writing_system_label,
 )
 from lexicon.prompt import build_prompt
-from lexicon.speak import arabic_for_speech
+from lexicon.speak import text_for_speech
 
 EMBED_MODEL = "openai/text-embedding-3-small"
 EMBED_URL = "https://openrouter.ai/api/v1/embeddings"
@@ -38,30 +39,40 @@ _IMPORT_MARK = "imported from vocabulary.csv"
 _BATCH = 64
 
 
-def _known_pairs(conn, user_id: str = LOCAL_USER) -> set[tuple[str, str]]:
+def _learning(conn, user_id: str, language: str | None = None) -> str:
+    return normalize_language(language or get_language(conn, user_id))
+
+
+def _known_pairs(
+    conn, user_id: str = LOCAL_USER, language: str | None = None
+) -> set[tuple[str, str]]:
+    learning = _learning(conn, user_id, language)
     rows = conn.execute(
         """
         SELECT i.spelling, i.gloss
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
-        WHERE l.user_id = ?
+        WHERE l.user_id = ? AND l.language = ?
         """,
-        (user_id,),
+        (user_id, learning),
     ).fetchall()
     return {(normalize_word(row["spelling"]), normalize_meaning(row["gloss"])) for row in rows}
 
 
-def drop_exact_duplicates(conn, user_id: str = LOCAL_USER) -> int:
+def drop_exact_duplicates(
+    conn, user_id: str = LOCAL_USER, language: str | None = None
+) -> int:
     """Keep the newest copy of a spelling with the same meaning. Other glosses stay."""
+    learning = _learning(conn, user_id, language)
     rows = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
-        WHERE l.user_id = ?
+        WHERE l.user_id = ? AND l.language = ?
         ORDER BY l.learned_on DESC, l.id DESC, i.id DESC
         """,
-        (user_id,),
+        (user_id, learning),
     ).fetchall()
     seen: set[tuple[str, str]] = set()
     remove: list[int] = []
@@ -85,13 +96,16 @@ def save_lesson(
     raw_text: str,
     embed=None,
     user_id: str = LOCAL_USER,
+    language: str | None = None,
 ) -> dict:
     """Parse the paste, store the lesson, and attach a gloss vector when one exists.
 
     A spelling with the same meaning as one already saved is not stored again.
+    Words are stored under the account's current learning language.
     """
+    learning = _learning(conn, user_id, language)
     parsed = [(spelling, gloss) for spelling, gloss in parse_lesson_text(raw_text)]
-    known = _known_pairs(conn, user_id)
+    known = _known_pairs(conn, user_id, learning)
     pairs = []
     skipped = []
     for spelling, gloss in parsed:
@@ -117,8 +131,9 @@ def save_lesson(
     with conn:
         lesson_id = insert_id(
             conn,
-            "INSERT INTO lessons (user_id, learned_on, raw_text, created_at) VALUES (?, ?, ?, ?)",
-            (user_id, learned_on, raw_text.strip(), created_at),
+            "INSERT INTO lessons (user_id, language, learned_on, raw_text, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, learning, learned_on, raw_text.strip(), created_at),
         )
         items = []
         for position, (spelling, gloss) in enumerate(pairs):
@@ -150,7 +165,9 @@ def save_lesson(
     return {"id": lesson_id, "learned_on": learned_on, "items": items, "skipped": skipped}
 
 
-def import_sheet(conn, embed=None, user_id: str = LOCAL_USER) -> dict:
+def import_sheet(
+    conn, embed=None, user_id: str = LOCAL_USER, language: str | None = None
+) -> dict:
     """Copy practice words from the CSV table into dated lessons.
 
     Exact re-imports are skipped. A second run does not add the same day again.
@@ -158,6 +175,7 @@ def import_sheet(conn, embed=None, user_id: str = LOCAL_USER) -> dict:
     """
     if embed is None:
         embed = embed_glosses
+    learning = _learning(conn, user_id, language)
     skip = {
         row["id"]
         for row in conn.execute(
@@ -193,7 +211,7 @@ def import_sheet(conn, embed=None, user_id: str = LOCAL_USER) -> dict:
         kind, spelling, gloss = oriented
         day = parse_date_added(row["date_added"]).date().isoformat()
         by_day.setdefault(day, []).append((spelling, gloss, kind))
-    return _commit_imported_days(conn, by_day, embed, user_id)
+    return _commit_imported_days(conn, by_day, embed, user_id, learning)
 
 
 def import_csv(
@@ -202,6 +220,7 @@ def import_csv(
     embed=None,
     user_id: str = LOCAL_USER,
     default_day: str | None = None,
+    language: str | None = None,
 ) -> dict:
     """Turn an uploaded vocabulary CSV into dated notebook lessons.
 
@@ -212,10 +231,11 @@ def import_csv(
     """
     if embed is None:
         embed = embed_glosses
+    learning = _learning(conn, user_id, language)
     fallback = (default_day or datetime.now(timezone.utc).date().isoformat()).strip()
     if len(fallback) != 10:
         raise ValueError("default day must be YYYY-MM-DD")
-    known = _known_pairs(conn, user_id)
+    known = _known_pairs(conn, user_id, learning)
     seen: set[tuple[str, str]] = set()
     by_day: dict[str, list[tuple[str, str, str]]] = {}
     for row in parse_vocabulary_csv(csv_text):
@@ -233,7 +253,7 @@ def import_csv(
         raise ValueError("no new words found in that CSV")
     added = 0
     for day, triples in by_day.items():
-        added += _store_imported_day(conn, day, triples, embed, user_id)
+        added += _store_imported_day(conn, day, triples, embed, user_id, learning)
     return {"days": len(by_day), "items": added}
 
 
@@ -250,22 +270,27 @@ def _csv_day(value: str, fallback: str) -> str:
     raise ValueError(f"unrecognized date: {text!r}")
 
 
-def _commit_imported_days(conn, by_day, embed, user_id: str) -> dict:
+def _commit_imported_days(conn, by_day, embed, user_id: str, language: str) -> dict:
+    learning = normalize_language(language)
     added = 0
     days = 0
     for day, triples in by_day.items():
         exists = conn.execute(
-            "SELECT id FROM lessons WHERE user_id = ? AND learned_on = ? AND raw_text = ?",
-            (user_id, day, _IMPORT_MARK),
+            "SELECT id FROM lessons WHERE user_id = ? AND language = ? "
+            "AND learned_on = ? AND raw_text = ?",
+            (user_id, learning, day, _IMPORT_MARK),
         ).fetchone()
         if exists:
             continue
         days += 1
-        added += _store_imported_day(conn, day, triples, embed, user_id)
+        added += _store_imported_day(conn, day, triples, embed, user_id, learning)
     return {"days": days, "items": added}
 
 
-def _store_imported_day(conn, day: str, triples, embed, user_id: str = LOCAL_USER) -> int:
+def _store_imported_day(
+    conn, day: str, triples, embed, user_id: str = LOCAL_USER, language: str = "arabic"
+) -> int:
+    learning = normalize_language(language)
     spellings = [(spelling, gloss, kind) for spelling, gloss, kind in triples]
     vectors: list[list[float] | None] = []
     glosses = [gloss for _, gloss, _ in spellings]
@@ -281,8 +306,9 @@ def _store_imported_day(conn, day: str, triples, embed, user_id: str = LOCAL_USE
     with conn:
         lesson_id = insert_id(
             conn,
-            "INSERT INTO lessons (user_id, learned_on, raw_text, created_at) VALUES (?, ?, ?, ?)",
-            (user_id, day, _IMPORT_MARK, created_at),
+            "INSERT INTO lessons (user_id, language, learned_on, raw_text, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, learning, day, _IMPORT_MARK, created_at),
         )
         for position, ((spelling, gloss, kind), vector) in enumerate(zip(spellings, vectors)):
             item_id = insert_id(
@@ -301,12 +327,20 @@ def _store_imported_day(conn, day: str, triples, embed, user_id: str = LOCAL_USE
     return len(spellings)
 
 
-def search_items(conn, query: str, embed=None, limit: int = 40, user_id: str = LOCAL_USER) -> list[dict]:
+def search_items(
+    conn,
+    query: str,
+    embed=None,
+    limit: int = 40,
+    user_id: str = LOCAL_USER,
+    language: str | None = None,
+) -> list[dict]:
     """Spelling hits first, then glosses close in meaning to an English query."""
+    learning = _learning(conn, user_id, language)
     needle = _fold(query)
     if len(needle) < 2:
-        return list_items(conn, user_id=user_id)
-    items = list_items(conn, user_id=user_id)
+        return list_items(conn, user_id=user_id, language=learning)
+    items = list_items(conn, user_id=user_id, language=learning)
     hits = []
     seen = set()
     arabizi = any(char in "2356789" for char in needle)
@@ -334,9 +368,9 @@ def search_items(conn, query: str, embed=None, limit: int = 40, user_id: str = L
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
-        WHERE l.user_id = ?
+        WHERE l.user_id = ? AND l.language = ?
         """,
-        (user_id,),
+        (user_id, learning),
     ).fetchall()
     ranked = []
     for row in stored:
@@ -368,16 +402,19 @@ def _fold(text: str) -> str:
     return " ".join(folded.split())
 
 
-def list_items(conn, user_id: str = LOCAL_USER) -> list[dict]:
+def list_items(
+    conn, user_id: str = LOCAL_USER, language: str | None = None
+) -> list[dict]:
+    learning = _learning(conn, user_id, language)
     rows = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id
+        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
-        WHERE l.user_id = ?
+        WHERE l.user_id = ? AND l.language = ?
         ORDER BY l.learned_on DESC, l.id DESC, i.position
         """,
-        (user_id,),
+        (user_id, learning),
     ).fetchall()
     return [dict(row) for row in rows]
 
@@ -397,7 +434,7 @@ def update_item(
         raise ValueError("need a word and a meaning")
     current = conn.execute(
         """
-        SELECT i.id, i.gloss
+        SELECT i.id, i.gloss, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE i.id = ? AND l.user_id = ?
@@ -406,15 +443,16 @@ def update_item(
     ).fetchone()
     if current is None:
         raise LookupError(f"no item {item_id}")
+    learning = normalize_language(current["language"])
     key = (normalize_word(spelling), normalize_meaning(gloss))
     for other in conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
-        WHERE i.id != ? AND l.user_id = ?
+        WHERE i.id != ? AND l.user_id = ? AND l.language = ?
         """,
-        (item_id, user_id),
+        (item_id, user_id, learning),
     ):
         if (normalize_word(other["spelling"]), normalize_meaning(other["gloss"])) == key:
             raise ValueError("that word is already saved")
@@ -447,7 +485,7 @@ def update_item(
             )
     row = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id
+        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE i.id = ? AND l.user_id = ?
@@ -459,15 +497,27 @@ def update_item(
 
 def similar_items(conn, item_id: int, limit: int = 5, user_id: str = LOCAL_USER) -> list[dict]:
     """Nearest other glosses by cosine similarity. Items without a vector are skipped."""
+    owned = conn.execute(
+        """
+        SELECT l.language
+        FROM lesson_items i
+        JOIN lessons l ON l.id = i.lesson_id
+        WHERE i.id = ? AND l.user_id = ?
+        """,
+        (item_id, user_id),
+    ).fetchone()
+    if owned is None:
+        return []
+    learning = normalize_language(owned["language"])
     rows = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss, i.kind, e.vector
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
-        WHERE l.user_id = ?
+        WHERE l.user_id = ? AND l.language = ?
         """,
-        (user_id,),
+        (user_id, learning),
     ).fetchall()
     target = None
     others = []
@@ -533,13 +583,13 @@ def judge_saved_item(
         card = PracticeCard(other["id"], other["kind"], other["spelling"], other["gloss"])
         if card not in cards:
             cards.append(card)
-    metalanguage = language or get_language(conn, user_id)
+    learning = normalize_language(language or get_language(conn, user_id))
     uses_target, fits_meaning, comment = call_model(
         build_prompt(
             PracticeSession(tuple(cards), ()),
             target,
             text,
-            language=metalanguage,
+            language=learning,
         ),
         api_key,
         opener,
@@ -609,7 +659,7 @@ _TALK_SCHEMA = {
 }
 _TALK_WORDS = 180
 _SCENES = {
-    "arabizi": {
+    "arabic": {
         "coffee": (
             "You are the person at the counter of a coffee shop. The learner is ordering.\n"
             "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
@@ -635,33 +685,48 @@ _SCENES = {
             "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
         ),
     },
-    "romaji": {
+    "japanese": {
         "coffee": (
-            "You are the person at the counter of a coffee shop. The learner is ordering.\n"
-            "Stay in that scene. Help them order a drink, then sweet or without sugar, large or small, and the price.\n"
-            "Use these romaji spellings: ahwe, baddi, helo, bala sukkar, kbeer, zgheer, qaddeesh.\n"
-            "Ask only one of those in a turn, the way a real counter does. If they miss it or say it awkwardly, put the useful line in better.\n"
+            "You are the person at the counter of a coffee shop in Japan. The learner is ordering.\n"
+            "Stay in that scene. Help them order a drink, size, and ask the price.\n"
+            "Use these romaji spellings: sumimasen, koohii, kudasai, ookii, chiisai, ikura.\n"
+            "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
         ),
         "restaurant": (
-            "You are the server in a restaurant. The learner is ordering food.\n"
-            "Stay in that scene. Help them ask for a dish, without spice, extra, and the bill.\n"
-            "Use these romaji spellings: baddi, bala har, extra, el hseb.\n"
+            "You are the server in a restaurant in Japan. The learner is ordering food.\n"
+            "Stay in that scene. Help them order, ask for the bill, and say thank you.\n"
+            "Use these romaji spellings: onegaishimasu, o-kaikei, arigatou.\n"
             "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
         ),
         "shop": (
-            "You are the shopkeeper. The learner wants to buy something.\n"
+            "You are the shopkeeper in Japan. The learner wants to buy something.\n"
             "Stay in that scene. Help them point to an item, ask the price, and ask for a cheaper one.\n"
-            "Use these romaji spellings: hayda, qaddeesh, arkhas.\n"
+            "Use these romaji spellings: kore, ikura, motto yasui.\n"
             "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
         ),
         "taxi": (
-            "You are the taxi driver. The learner is a passenger.\n"
+            "You are the taxi driver in Japan. The learner is a passenger.\n"
             "Stay in that scene. Help them name the destination, ask the price, and say stop here.\n"
-            "Use these romaji spellings: 'a, qaddeesh, wa''ef hon.\n"
+            "Use these romaji spellings: onegaishimasu, ikura, koko de tomatte.\n"
             "Ask only one thing per turn. If they miss it, put the useful line in better.\n"
         ),
     },
 }
+
+
+_ARABIZI_DIGITS = re.compile(r"[2356789]")
+_ARABIC_SCRIPT = re.compile(
+    r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]"
+)
+_JAPANESE_SCRIPT = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
+_LEVANTINE_MARKERS = re.compile(
+    r"\b("
+    r"keefak|kifak|ahlan|ahla|mar7aba|marhaba|ahwe|baddi|shu|shou|"
+    r"yalla|habibi|habibti|feek|keef|kifik|shtagh|tammam|mnih|mnii7|"
+    r"salaam|salam|wahad|wa7ad|shukran"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def talk(
@@ -674,22 +739,21 @@ def talk(
     user_id: str = LOCAL_USER,
     language: str | None = None,
 ) -> dict:
-    """One short Levantine reply that prefers words already saved.
+    """One short reply in the learning language, preferring saved words.
 
     The newest saved words are the ones the model sees, so a turn stays small.
-    Arabic script is for Sawt's speech. English accounts speak/type Arabizi;
-    Japanese accounts may speak Japanese, and see romaji on the page.
+    TTS uses the learning language's native script. The page shows Arabizi or
+    romaji. English glosses stay on the page; the app UI is English.
     """
     history = _talk_turns(turns)
-    drop_exact_duplicates(conn, user_id=user_id)
-    metalanguage = language or get_language(conn, user_id)
-    if metalanguage not in ("en", "ja"):
-        metalanguage = DEFAULT_LANGUAGE
-    system = writing_system(metalanguage)
-    latin = writing_system_label(metalanguage)
+    learning = _learning(conn, user_id, language)
+    drop_exact_duplicates(conn, user_id=user_id, language=learning)
+    latin = writing_system_label(learning)
+    script = speech_script_label(learning)
+    target_name = learning_label(learning)
     seen: set[str] = set()
     chosen = []
-    for item in list_items(conn, user_id=user_id):
+    for item in list_items(conn, user_id=user_id, language=learning):
         key = normalize_word(item["spelling"])
         if not key or key in seen:
             continue
@@ -701,21 +765,89 @@ def talk(
         raise ValueError("save a few words first")
     vocab = "\n".join(f"{item['spelling']} = {item['gloss']}" for item in chosen)
     spoken = "\n".join(f"{turn['role']}: {turn['text']}" for turn in history)
-    scenes = _SCENES[system]
+    scenes = _SCENES[learning]
     scene_block = f"\n{scenes[scene]}\n" if scene in scenes else "\n"
-    prompt = (
-        "You are a Levantine friend on a voice call, not a teacher giving a lesson.\n"
+    prompt = _talk_prompt(
+        learning=learning,
+        target_name=target_name,
+        latin=latin,
+        script=script,
+        scene_block=scene_block,
+        vocab=vocab,
+        spoken=spoken,
+    )
+    if opener is None:
+        opener = urllib.request.urlopen
+    data = _talk_model_json(prompt, api_key, opener, pace)
+    if _talk_reply_off_language(data, learning):
+        repair = (
+            prompt
+            + "\n\nIMPORTANT CORRECTION:\n"
+            + f"Your previous reply was in the wrong language. LANGUAGE={learning}.\n"
+            + f"Rewrite the whole JSON in {target_name} only.\n"
+            + (
+                "FORBIDDEN: Levantine Arabic, Arabizi digit letters (2/3/5/6/7/8/9), "
+                "words like keefak/ahlan/mar7aba/ahwe/baddi.\n"
+                "REQUIRED: japanese kana/kanji in arabic, Hepburn romaji in arabizi.\n"
+                if learning == "japanese"
+                else "FORBIDDEN: Japanese kana/kanji. REQUIRED: Arabic script in arabic, Arabizi in arabizi.\n"
+            )
+        )
+        data = _talk_model_json(repair, api_key, opener, pace)
+    if _talk_reply_off_language(data, learning):
+        raise ValueError(
+            f"reply was not {target_name} — tap talk again"
+        )
+    speech = str(data["arabic"]).strip()
+    try:
+        speech = text_for_speech(speech, learning)
+    except ValueError:
+        # Keep empty so the page can fall back to typing; never send Latin to TTS.
+        speech = ""
+    return {
+        "you_arabizi": str(data["you_arabizi"]).strip(),
+        "you_english": str(data["you_english"]).strip(),
+        "arabic": speech,
+        "arabizi": str(data["arabizi"]).strip(),
+        "english": str(data["english"]).strip(),
+        "correction": str(data["correction"]).strip(),
+        "better": str(data["better"]).strip(),
+        "language": learning,
+    }
+
+
+def _talk_prompt(
+    *,
+    learning: str,
+    target_name: str,
+    latin: str,
+    script: str,
+    scene_block: str,
+    vocab: str,
+    spoken: str,
+) -> str:
+    return (
+        f"LANGUAGE LOCK: {learning}\n"
+        f"You are a {target_name} friend on a voice call, not a teacher giving a lesson.\n"
+        f"This call is entirely in {target_name}. Reply in {target_name} only.\n"
+        f"Never use Levantine Arabic when LANGUAGE=japanese. "
+        f"Never use Japanese when LANGUAGE=arabic. "
+        "Never put English in the spoken fields.\n"
         "Answer in one or two short spoken sentences, the way people actually talk.\n"
         "Prefer the learner's saved words when they fit. Each spelling is listed once.\n"
         "Do not repeat a line you already said in this conversation. Do not quiz them.\n"
-        f"{_talk_spelling_block(system)}"
-        f"{_talk_learner_input_block(metalanguage, latin)}"
-        "arabic is ONLY Arabic Unicode script for text-to-speech — letters like مرحبا كيفك.\n"
-        "Never put romaji, Arabizi digits, English, or Japanese in arabic. TTS reads that field aloud.\n"
-        f"arabizi is your spoken reply in {latin} (field name is historical).\n"
-        f"{_talk_metalanguage_block(metalanguage, latin)}"
+        f"The learner may speak {script} into the mic or type {latin}; understand either.\n"
+        f"{_talk_spelling_block(learning)}"
+        "JSON field names are historical leftovers — obey the meanings below, not the names:\n"
+        f"- you_arabizi = learner's line in {latin} (no native script)\n"
+        "- you_english = English gloss of the learner's line (UI only)\n"
+        f"- arabic = ONLY {script} script for TTS (never Latin, never the other language)\n"
+        f"- arabizi = your reply in {latin}\n"
+        "- english = English gloss of your reply (UI only)\n"
+        f"Never put English into you_arabizi, arabizi, better, or arabic — those stay {latin} or {script}.\n"
         "If the latest user line begins with Start or スタート, you speak first in the scene and leave you_arabizi and you_english empty.\n"
-        f"{_talk_correction_block(metalanguage, latin)}"
+        f"If their {target_name} is off, set correction to one kind English sentence about what was off,\n"
+        f"and better to a fuller way they could say it, in {latin}. If it was fine, leave both empty.\n"
         + scene_block
         + "Saved words, newest first:\n"
         f"{vocab}\n"
@@ -723,89 +855,59 @@ def talk(
         "Conversation:\n"
         f"{spoken}\n"
     )
+
+
+def _talk_model_json(prompt: str, api_key: str, opener, pace) -> dict:
     body = _json_body(prompt, "reply", _TALK_SCHEMA, temperature=0.4)
     body["max_tokens"] = 280
-    if opener is None:
-        opener = urllib.request.urlopen
     payload = complete(body, api_key, opener, pace=pace)
-    data = json.loads(message_text(payload))
-    arabic = str(data["arabic"]).strip()
-    try:
-        arabic = arabic_for_speech(arabic)
-    except ValueError:
-        # Keep empty so the page can fall back to typing; never send romaji to TTS.
-        arabic = ""
-    return {
-        "you_arabizi": str(data["you_arabizi"]).strip(),
-        "you_english": str(data["you_english"]).strip(),
-        "arabic": arabic,
-        "arabizi": str(data["arabizi"]).strip(),
-        "english": str(data["english"]).strip(),
-        "correction": str(data["correction"]).strip(),
-        "better": str(data["better"]).strip(),
-    }
+    return json.loads(message_text(payload))
 
 
-def _talk_spelling_block(system: str) -> str:
-    """Latin spelling rules. Arabic script for speech is separate."""
-    if system == "romaji":
+def _talk_reply_off_language(data: dict, language: str) -> bool:
+    """True when the model slipped into the other learning language."""
+    spoken = " ".join(
+        str(data.get(key) or "")
+        for key in ("arabizi", "arabic", "you_arabizi", "better")
+    )
+    if normalize_language(language) == "japanese":
+        if _ARABIZI_DIGITS.search(spoken) or _LEVANTINE_MARKERS.search(spoken):
+            return True
+        if _ARABIC_SCRIPT.search(spoken):
+            return True
+        # Need Japanese script for TTS when there is a spoken reply.
+        reply_latin = str(data.get("arabizi") or "").strip()
+        reply_speech = str(data.get("arabic") or "").strip()
+        if reply_latin and not _JAPANESE_SCRIPT.search(reply_speech):
+            return True
+        return False
+    if _JAPANESE_SCRIPT.search(spoken):
+        return True
+    reply_latin = str(data.get("arabizi") or "").strip()
+    reply_speech = str(data.get("arabic") or "").strip()
+    if reply_latin and not _ARABIC_SCRIPT.search(reply_speech):
+        return True
+    return False
+
+
+def _talk_spelling_block(language: str) -> str:
+    """Latin spelling rules for the learning language."""
+    if normalize_language(language) == "japanese":
         return (
-            "Spell Levantine in romaji (ローマ字), lowercase, the way a Japanese learner writes Arabic sounds in Latin letters.\n"
-            "Copy a saved word exactly when you use it.\n"
-            "Do not use Arabizi digit letters (2, 3, 5, 6, 7, 8, 9).\n"
-            "Use ' for ء/أ and ع, gh for غ, kh for خ, t for ط, h for ح, q for ق, s for ص, d for ض.\n"
-            "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
-            "مرحبا is marhaba (not mar7aba). قديش is qaddeesh (not 8addeesh).\n"
+            "Speak natural Japanese. Put kana/kanji in the arabic field so TTS can say it.\n"
+            "Spell the same line in Hepburn romaji in arabizi, lowercase, and copy a saved word exactly when you use it.\n"
+            "Use oo/ou and ee for long vowels the way this notebook does. こんにちは is konnichiwa.\n"
+            "Do not invent wapuro quirks the learner did not save.\n"
+            "FORBIDDEN examples: ahlan, keefak, mar7aba, ahwe, baddi, anything with digit letters 2/3/5/6/7/8/9.\n"
+            "GOOD example: arabic=どういたしまして arabizi=douitashimashite english=you're welcome.\n"
+            "GOOD example: arabic=コーヒーをください arabizi=koohii o kudasai english=coffee please.\n"
         )
     return (
+        "Speak Levantine Arabic. Put Arabic script in the arabic field so TTS can say it.\n"
         "Spell Arabizi the way this notebook does, lowercase, and copy a saved word exactly when you use it.\n"
         "2 is ء or أ, 3 is ع, 3' is غ, 5 is خ, 6 is ط, 7 is ح, 8 is ق, 9 is ص, 9' is ض.\n"
         "Write long ee as ee and long oo as oo. كيفك is keefak, never kayfak or kifak.\n"
-    )
-
-
-def _talk_learner_input_block(language: str, latin: str) -> str:
-    """How to read the learner's mic/typed line for this account language."""
-    if language == "ja":
-        return (
-            "The learner often speaks Japanese into the mic. They may also type Japanese or Levantine romaji.\n"
-            "Understand Japanese naturally and answer as a friend in Levantine — do not answer in Japanese speech.\n"
-            "If their latest line is Japanese (hiragana, katakana, or kanji):\n"
-            "  you_english = clean Japanese for what they meant\n"
-            f"  you_arabizi = natural Levantine {latin} for how to say that meaning (so they learn the line)\n"
-            "If their latest line is already Levantine romaji, you_arabizi is that line in this notebook's spelling,\n"
-            "and you_english is its Japanese gloss.\n"
-        )
-    return (
-        f"you_arabizi is what the learner just said, in {latin}. No Arabic script there.\n"
-        "you_english is a plain English translation of that line.\n"
-    )
-
-
-def _talk_correction_block(language: str, latin: str) -> str:
-    if language == "ja":
-        return (
-            "If they spoke Japanese, leave correction empty; you_arabizi already teaches the Levantine line.\n"
-            f"You may set better to that same {latin} line. If they tried Levantine romaji and it was off,\n"
-            "set correction to one kind Japanese sentence about what was off, and better to a fuller "
-            f"{latin} line. If it was fine, leave both empty.\n"
-        )
-    return (
-        "If their Levantine is off, set correction to one kind sentence about what was off,\n"
-        f"and better to a fuller way they could say it, in {latin}. If it was fine, leave both empty.\n"
-    )
-
-
-def _talk_metalanguage_block(language: str, latin: str) -> str:
-    """Instructions for page glosses. Latin spelling and Arabic script stay Levantine."""
-    label = metalanguage_label(language)
-    return (
-        f"The learner's metalanguage is {label}.\n"
-        f"you_english and english are plain {label} for the page "
-        "(the field names say english for historical reasons).\n"
-        f"correction, when set, is also {label}.\n"
-        f"Never put Japanese or English into you_arabizi, arabizi, or better — those stay {latin}.\n"
-        "arabic stays Arabic script only, for Sawt's speech out.\n"
+        "FORBIDDEN: Japanese kana/kanji, romaji-only replies with no Arabic script in arabic.\n"
     )
 
 

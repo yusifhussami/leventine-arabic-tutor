@@ -16,6 +16,7 @@ from lexicon.notebook import (
     talk,
     update_item,
 )
+from lexicon.prefs import save_language
 
 SAMPLE = (
     "baza5 = fancy we7deh = loneliness "
@@ -86,6 +87,36 @@ class NotebookTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.conn.close()
         self.tmp.cleanup()
+
+    def test_arabic_and_japanese_words_stay_on_separate_notebooks(self) -> None:
+        save_lesson(
+            self.conn,
+            "2026-10-01",
+            "baza5 = fancy",
+            embed=_vectors,
+            language="arabic",
+        )
+        save_lesson(
+            self.conn,
+            "2026-10-02",
+            "hello - konnichiwa",
+            embed=lambda glosses: [[1.0, 0.0] for _ in glosses],
+            language="japanese",
+        )
+        arabic = list_items(self.conn, language="arabic")
+        japanese = list_items(self.conn, language="japanese")
+        self.assertEqual([item["spelling"] for item in arabic], ["baza5"])
+        self.assertEqual([item["spelling"] for item in japanese], ["konnichiwa"])
+        save_language(self.conn, "japanese")
+        self.assertEqual(
+            [item["spelling"] for item in list_items(self.conn)],
+            ["konnichiwa"],
+        )
+        save_language(self.conn, "arabic")
+        self.assertEqual(
+            [item["spelling"] for item in list_items(self.conn)],
+            ["baza5"],
+        )
 
     def test_a_lesson_keeps_every_pair_and_ranks_similar_glosses(self) -> None:
         saved = save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
@@ -170,61 +201,163 @@ class NotebookTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             talk(self.conn, [], "test-key", opener, pace=RateLimiter(min_interval=0))
 
-    def test_talk_japanese_account_uses_romaji_not_arabizi_digits(self) -> None:
-        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+    def test_talk_only_sees_words_for_the_active_language(self) -> None:
+        save_lesson(
+            self.conn,
+            "2026-10-01",
+            "baza5 = fancy",
+            embed=_vectors,
+            language="arabic",
+        )
+        save_lesson(
+            self.conn,
+            "2026-10-02",
+            "hello - konnichiwa",
+            embed=lambda glosses: [[0.0, 1.0] for _ in glosses],
+            language="japanese",
+        )
+
+        def opener(request, timeout):
+            prompt = json.loads(request.data.decode())["messages"][0]["content"]
+            self.assertIn("konnichiwa = hello", prompt)
+            self.assertNotIn("baza5", prompt)
+            return _TalkResponse(
+                {
+                    "you_arabizi": "konnichiwa",
+                    "you_english": "hello",
+                    "arabic": "こんにちは",
+                    "arabizi": "konnichiwa",
+                    "english": "hello",
+                    "correction": "",
+                    "better": "",
+                }
+            )
+
+        talk(
+            self.conn,
+            [{"role": "user", "text": "こんにちは"}],
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0),
+            language="japanese",
+        )
+
+    def test_talk_japanese_learning_uses_romaji_and_japanese_speech(self) -> None:
+        save_lesson(
+            self.conn,
+            "2026-10-01",
+            "hello - konnichiwa\ncoffee - koohii",
+            embed=lambda glosses: [[1.0, 0.0] for _ in glosses],
+            language="japanese",
+        )
 
         def opener(request, timeout):
             body = json.loads(request.data.decode())
             prompt = body["messages"][0]["content"]
-            self.assertIn("keefak", prompt)
-            self.assertIn("Spell Levantine in romaji", prompt)
-            self.assertIn("Do not use Arabizi digit letters", prompt)
-            self.assertIn("marhaba (not mar7aba)", prompt)
-            self.assertIn("The learner's metalanguage is Japanese.", prompt)
-            self.assertIn("those stay romaji", prompt)
-            self.assertIn("The learner often speaks Japanese into the mic.", prompt)
-            self.assertIn("Understand Japanese naturally", prompt)
+            self.assertIn("LANGUAGE LOCK: japanese", prompt)
+            self.assertIn("You are a Japanese friend", prompt)
+            self.assertIn("This call is entirely in Japanese", prompt)
+            self.assertIn("Speak natural Japanese", prompt)
+            self.assertIn("konnichiwa = hello", prompt)
             self.assertNotIn("2 is ء or أ", prompt)
             return _TalkResponse(
                 {
-                    "you_arabizi": "baddi ahwe",
-                    "you_english": "コーヒーください",
-                    "arabic": "بدي قهوة",
-                    "arabizi": "tfaddal",
-                    "english": "どうぞ",
+                    "you_arabizi": "konnichiwa",
+                    "you_english": "hello",
+                    "arabic": "こんにちは",
+                    "arabizi": "konnichiwa",
+                    "english": "hello",
                     "correction": "",
-                    "better": "baddi ahwe",
+                    "better": "",
                 }
             )
 
         reply = talk(
             self.conn,
-            [{"role": "user", "text": "コーヒーください"}],
+            [{"role": "user", "text": "こんにちは"}],
             "test-key",
             opener,
             pace=RateLimiter(min_interval=0),
-            language="ja",
+            language="japanese",
         )
-        self.assertEqual(reply["you_arabizi"], "baddi ahwe")
-        self.assertEqual(reply["arabizi"], "tfaddal")
-        self.assertEqual(reply["arabic"], "بدي قهوة")
-        self.assertEqual(reply["english"], "どうぞ")
+        self.assertEqual(reply["you_arabizi"], "konnichiwa")
+        self.assertEqual(reply["arabizi"], "konnichiwa")
+        self.assertEqual(reply["arabic"], "こんにちは")
+        self.assertEqual(reply["english"], "hello")
+        self.assertEqual(reply["language"], "japanese")
 
-    def test_talk_japanese_coffee_scene_uses_romaji_spellings(self) -> None:
-        save_lesson(self.conn, "2026-10-01", SAMPLE, embed=_vectors)
+    def test_talk_japanese_retries_when_model_answers_in_arabizi(self) -> None:
+        save_lesson(
+            self.conn,
+            "2026-10-01",
+            "thanks - arigatou",
+            embed=lambda glosses: [[1.0, 0.0] for _ in glosses],
+            language="japanese",
+        )
+        calls = {"n": 0}
+
+        def opener(request, timeout):
+            calls["n"] += 1
+            prompt = json.loads(request.data.decode())["messages"][0]["content"]
+            if calls["n"] == 1:
+                return _TalkResponse(
+                    {
+                        "you_arabizi": "arigatou",
+                        "you_english": "thanks",
+                        "arabic": "أهلا فيك",
+                        "arabizi": "ahlan feek! keefak?",
+                        "english": "welcome how are you",
+                        "correction": "",
+                        "better": "",
+                    }
+                )
+            self.assertIn("IMPORTANT CORRECTION", prompt)
+            self.assertIn("wrong language", prompt)
+            return _TalkResponse(
+                {
+                    "you_arabizi": "arigatou",
+                    "you_english": "thanks",
+                    "arabic": "どういたしまして",
+                    "arabizi": "douitashimashite",
+                    "english": "you're welcome",
+                    "correction": "",
+                    "better": "",
+                }
+            )
+
+        reply = talk(
+            self.conn,
+            [{"role": "user", "text": "ありがとう"}],
+            "test-key",
+            opener,
+            pace=RateLimiter(min_interval=0),
+            language="japanese",
+        )
+        self.assertEqual(calls["n"], 2)
+        self.assertEqual(reply["arabizi"], "douitashimashite")
+        self.assertEqual(reply["arabic"], "どういたしまして")
+
+    def test_talk_japanese_coffee_scene_uses_japanese_romaji(self) -> None:
+        save_lesson(
+            self.conn,
+            "2026-10-01",
+            "please - kudasai\ncoffee - koohii",
+            embed=lambda glosses: [[1.0, 0.0] for _ in glosses],
+            language="japanese",
+        )
 
         def opener(request, timeout):
             prompt = json.loads(request.data.decode())["messages"][0]["content"]
-            self.assertIn("helo", prompt)
-            self.assertIn("qaddeesh", prompt)
+            self.assertIn("koohii", prompt)
+            self.assertIn("kudasai", prompt)
             self.assertNotIn("7elo", prompt)
             return _TalkResponse(
                 {
                     "you_arabizi": "",
                     "you_english": "",
-                    "arabic": "أهلا",
-                    "arabizi": "ahla",
-                    "english": "こんにちは",
+                    "arabic": "いらっしゃいませ",
+                    "arabizi": "irasshaimase",
+                    "english": "welcome",
                     "correction": "",
                     "better": "",
                 }
@@ -236,10 +369,11 @@ class NotebookTests(unittest.TestCase):
             "test-key",
             opener,
             pace=RateLimiter(min_interval=0),
-            language="ja",
+            language="japanese",
             scene="coffee",
         )
-        self.assertEqual(reply["arabizi"], "ahla")
+        self.assertEqual(reply["arabizi"], "irasshaimase")
+        self.assertEqual(reply["arabic"], "いらっしゃいませ")
 
     def test_sheet_import_is_searchable_by_spelling_and_meaning(self) -> None:
         csv_path = Path(self.tmp.name) / "vocab.csv"
