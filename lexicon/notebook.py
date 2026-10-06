@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 import urllib.request
 from datetime import datetime, timezone
 
@@ -34,12 +35,14 @@ from lexicon.speak import text_for_speech
 
 EMBED_MODEL = "openai/text-embedding-3-small"
 EMBED_URL = "https://openrouter.ai/api/v1/embeddings"
-_EMBED_PACE = RateLimiter()
+_EMBED_PACE = RateLimiter(min_interval=0.15)
 # Voice turns need to fire as soon as the model is free. Sentence checks keep the
 # slower shared gap in judge.py; Talk uses its own short pace.
 _TALK_PACE = RateLimiter(min_interval=0.25)
 _IMPORT_MARK = "imported from vocabulary.csv"
 _BATCH = 64
+_QUERY_EMBED_CACHE: dict[str, tuple[float, list[float]]] = {}
+_QUERY_EMBED_TTL = 90.0
 
 
 def _learning(conn, user_id: str, language: str | None = None) -> str:
@@ -338,33 +341,52 @@ def search_items(
     user_id: str = LOCAL_USER,
     language: str | None = None,
 ) -> list[dict]:
-    """Spelling hits first, then glosses close in meaning to an English query."""
+    """Rank words by relevance: spelling hits, then gloss hits, then meaning."""
     learning = _learning(conn, user_id, language)
     needle = _fold(query)
     if len(needle) < 2:
         return list_items(conn, user_id=user_id, language=learning)
+
     items = list_items(conn, user_id=user_id, language=learning)
-    hits = []
-    seen = set()
     arabizi = any(char in "2356789" for char in needle)
+    scored: list[tuple[float, dict]] = []
+    seen: set[int] = set()
+
     for item in items:
         spelling = _fold(item["spelling"])
         gloss = _fold(item["gloss"])
-        if needle in spelling or (not arabizi and needle in gloss):
-            found = dict(item)
-            found["match"] = "spelling" if needle in spelling else "meaning"
-            hits.append(found)
-            seen.add(item["id"])
-            if len(hits) >= limit:
-                return hits
+        score = 0.0
+        match = ""
+        if spelling == needle:
+            score, match = 1.0, "spelling"
+        elif spelling.startswith(needle):
+            score, match = 0.96, "spelling"
+        elif needle in spelling:
+            score, match = 0.92, "spelling"
+        elif not arabizi and gloss == needle:
+            score, match = 0.9, "meaning"
+        elif not arabizi and needle in gloss:
+            score, match = 0.86, "meaning"
+        if not match:
+            continue
+        found = dict(item)
+        found["match"] = match
+        found["score"] = score
+        scored.append((score, found))
+        seen.add(item["id"])
+
     if arabizi or embed is False:
-        return hits
+        scored.sort(key=lambda pair: (-pair[0], pair[1]["spelling"].casefold()))
+        return [item for _, item in scored[:limit]]
+
     if embed is None:
         embed = embed_glosses
     try:
-        vector = embed([query])[0]
+        vector = _query_embedding(query, embed)
     except Exception:
-        return hits
+        scored.sort(key=lambda pair: (-pair[0], pair[1]["spelling"].casefold()))
+        return [item for _, item in scored[:limit]]
+
     stored = conn.execute(
         """
         SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, e.vector
@@ -375,29 +397,45 @@ def search_items(
         """,
         (user_id, learning),
     ).fetchall()
-    ranked = []
     for row in stored:
         if row["id"] in seen:
             continue
         score = cosine(vector, json.loads(row["vector"]))
         if score < 0.45:
             continue
-        ranked.append((score, row))
-    ranked.sort(key=lambda pair: pair[0], reverse=True)
-    for score, row in ranked[: limit - len(hits)]:
-        hits.append(
-            {
-                "id": row["id"],
-                "spelling": row["spelling"],
-                "gloss": row["gloss"],
-                "kind": row["kind"],
-                "learned_on": row["learned_on"],
-                "lesson_id": row["lesson_id"],
-                "match": "meaning",
-                "score": round(score, 3),
-            }
+        scored.append(
+            (
+                score,
+                {
+                    "id": row["id"],
+                    "spelling": row["spelling"],
+                    "gloss": row["gloss"],
+                    "kind": row["kind"],
+                    "learned_on": row["learned_on"],
+                    "lesson_id": row["lesson_id"],
+                    "match": "meaning",
+                    "score": round(score, 3),
+                },
+            )
         )
-    return hits
+
+    scored.sort(key=lambda pair: (-pair[0], pair[1]["spelling"].casefold()))
+    return [item for _, item in scored[:limit]]
+
+
+def _query_embedding(query: str, embed) -> list[float]:
+    """Reuse a recent query vector so repeat/typo searches stay snappy."""
+    key = _fold(query)
+    now = time.monotonic()
+    cached = _QUERY_EMBED_CACHE.get(key)
+    if cached and now - cached[0] < _QUERY_EMBED_TTL:
+        return cached[1]
+    vector = embed([query])[0]
+    _QUERY_EMBED_CACHE[key] = (now, vector)
+    if len(_QUERY_EMBED_CACHE) > 64:
+        oldest = min(_QUERY_EMBED_CACHE, key=lambda name: _QUERY_EMBED_CACHE[name][0])
+        _QUERY_EMBED_CACHE.pop(oldest, None)
+    return vector
 
 
 def _fold(text: str) -> str:

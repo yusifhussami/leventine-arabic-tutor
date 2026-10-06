@@ -926,6 +926,8 @@
     let authReady = false;
     let learningLanguage = normalizeLearningLanguage(localStorage.getItem("language"));
     let pendingCsvText = "";
+    let libraryRequest = 0;
+    let searchTimer = null;
 
     function normalizeLearningLanguage(value) {
       const raw = (value || "").toLowerCase();
@@ -995,6 +997,7 @@
       yourSentence: "Your sentence",
       checkSentence: "Check sentence",
       search: "Search",
+      searchResults: "Best matches",
       connectCalendar: "Connect Google Calendar to see your next Arabic lesson.",
       noLesson: "No upcoming Preply lesson on that calendar.",
       calendarReadError: "Could not read the calendar.",
@@ -1725,19 +1728,24 @@
     };
 
     async function loadLibrary() {
+      const requestId = ++libraryRequest;
       document.querySelector("#library-error").textContent = "";
       const query = document.querySelector("#search").value.trim();
       const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
-      const items = await (await apiFetch(url)).json();
+      let items;
+      try {
+        const response = await apiFetch(url);
+        items = await response.json();
+      } catch (err) {
+        if (requestId !== libraryRequest) return;
+        document.querySelector("#library-error").textContent = err.message || "Search failed.";
+        return;
+      }
+      if (requestId !== libraryRequest) return;
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
-      const groups = new Map();
-      for (const item of items) {
-        if (!groups.has(item.learned_on)) groups.set(item.learned_on, []);
-        groups.get(item.learned_on).push(item);
-      }
-      if (groups.size === 0) {
+      if (!Array.isArray(items) || items.length === 0) {
         count.textContent = "";
         const empty = document.createElement("p");
         empty.className = "empty";
@@ -1752,18 +1760,40 @@
         return;
       }
       count.textContent = t("wordCount")(items.length);
+      if (query) {
+        // Search stays in relevance order — do not regroup by lesson date.
+        const heading = document.createElement("h3");
+        heading.textContent = t("searchResults");
+        library.append(heading);
+        const table = document.createElement("table");
+        const body = document.createElement("tbody");
+        for (const item of items) body.append(wordRow(item));
+        table.append(body);
+        library.append(table);
+        return;
+      }
+      const groups = new Map();
+      for (const item of items) {
+        if (!groups.has(item.learned_on)) groups.set(item.learned_on, []);
+        groups.get(item.learned_on).push(item);
+      }
       for (const [date, rows] of groups) {
         const heading = document.createElement("h3");
         heading.textContent = formatDay(date);
         library.append(heading);
         const table = document.createElement("table");
         const body = document.createElement("tbody");
-        for (const item of rows) {
-          body.append(wordRow(item));
-        }
+        for (const item of rows) body.append(wordRow(item));
         table.append(body);
         library.append(table);
       }
+    }
+
+    function scheduleLibrarySearch() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        loadLibrary().catch(() => {});
+      }, 280);
     }
 
     function wordRow(item) {
@@ -2450,7 +2480,19 @@
 
     applyLanguage(learningLanguage);
     runMotion();
-    document.querySelector("#search").addEventListener("input", () => loadLibrary());
+    const searchField = document.querySelector("#search");
+    searchField.addEventListener("input", scheduleLibrarySearch);
+    searchField.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      // type=search otherwise submits/refires and the list flickers.
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      loadLibrary().catch(() => {});
+    });
+    searchField.addEventListener("search", () => {
+      clearTimeout(searchTimer);
+      loadLibrary().catch(() => {});
+    });
     bootAuth().then(() => {
       if (clerk && !clerk.user) return;
       return loadLanguage().then(() => {

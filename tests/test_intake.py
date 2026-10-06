@@ -406,6 +406,24 @@ class NotebookTests(unittest.TestCase):
         self.assertEqual(lonely[0]["spelling"], "we7deh")
         self.assertEqual(lonely[0]["match"], "meaning")
 
+    def test_search_ranks_by_relevance_not_lesson_date(self) -> None:
+        def embed(texts: list[str]) -> list[list[float]]:
+            table = {
+                "loneliness": [0.1, 1.0],
+                "lonely": [0.15, 0.98],
+                "but": [1.0, 0.0],
+                "and": [0.95, 0.05],
+            }
+            return [table.get(text, [0.0, 0.0]) for text in texts]
+
+        save_lesson(self.conn, "2026-09-01", "we7deh = loneliness", embed=embed)
+        save_lesson(self.conn, "2026-10-05", "bas = but\nw = and", embed=embed)
+        hits = search_items(self.conn, "lonely", embed=embed)
+        self.assertEqual(hits[0]["spelling"], "we7deh")
+        self.assertGreater(hits[0]["score"], 0.45)
+        # Exact spelling still beats a newer unrelated lesson.
+        self.assertEqual(search_items(self.conn, "bas", embed=embed)[0]["spelling"], "bas")
+
     def test_csv_upload_fills_an_empty_notebook(self) -> None:
         def embed(texts: list[str]) -> list[list[float]]:
             return [[0.0, 0.0] for _ in texts]
