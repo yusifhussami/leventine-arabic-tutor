@@ -1,18 +1,27 @@
 """Split a pasted lesson into Latin spellings and glosses.
 
-Two shapes can sit in the same paste. `practice - tadreeb` is the meaning,
-then a dash, then one Latin spelling (Arabizi or romaji). `8ararat = decisions`
-or `qararat = 決定` is spelling, then equals, then the gloss. A chain of equals
-signs still works: the gloss runs until the next token that contains an Arabizi
-digit (2, 3, 5, 6, 7, 8, 9), or the last token when there is no digit (romaji).
-Letter-only words such as "al" stay inside that phrase once the digit has
-started it.
+Two shapes can sit in the same paste.
+
+One pair per line (what people type most):
+  `6awaret - i developed`  → Arabizi first, English meaning (rest of line)
+  `practice - tadreeb`     → English first, one Latin spelling
+  `8ararat = decisions`    → spelling, then equals, then the gloss
+
+Same-line chains still work: `practice - tadreeb to train - etdarrab`
+or a chain of equals signs. In an equals chain the gloss runs until the next
+token that contains an Arabizi digit (2, 3, 5, 6, 7, 8, 9), or the last token
+when there is no digit (romaji). Letter-only words such as "al" stay inside
+that phrase once the digit has started it.
 """
 
 from __future__ import annotations
 
+import re
+
 _ARABIZI_DIGITS = frozenset("2356789")
 _DASHES = (" - ", " – ", " — ")
+# "shasheh- sit" — dash stuck to the spelling, space before the meaning.
+_TIGHT_DASH = re.compile(r"(\S)([-–—])(\s+\S)")
 
 
 def parse_lesson_text(text: str) -> list[tuple[str, str]]:
@@ -27,6 +36,8 @@ def parse_lesson_text(text: str) -> list[tuple[str, str]]:
 
 def _parse_mixed(text: str) -> list[tuple[str, str]]:
     remaining = " ".join(text.split())
+    if _separator_count(remaining) <= 1:
+        return [_parse_one_pair(remaining)]
     pairs: list[tuple[str, str]] = []
     while remaining:
         dash_at, dash_len = _first_dash(remaining)
@@ -34,12 +45,18 @@ def _parse_mixed(text: str) -> list[tuple[str, str]]:
         if dash_at == -1 and equals_at == -1:
             raise ValueError(f"need a word and a meaning: {remaining!r}")
         if equals_at == -1 or (dash_at != -1 and dash_at < equals_at):
-            gloss = remaining[:dash_at].strip()
+            left = remaining[:dash_at].strip()
             after = remaining[dash_at + dash_len :].strip()
-            spelling, _, after = after.partition(" ")
-            if not gloss or not spelling:
+            if not left or not after:
                 raise ValueError(f"need a word and a meaning: {remaining!r}")
-            pairs.append((spelling, gloss))
+            if _has_arabizi_digit(left):
+                # Arabizi-first pairs keep the whole right side as the meaning.
+                pairs.append((left, after))
+                return pairs
+            spelling, _, after = after.partition(" ")
+            if not spelling:
+                raise ValueError(f"need a word and a meaning: {remaining!r}")
+            pairs.append((spelling, left))
             remaining = after.strip()
             continue
         spelling = remaining[:equals_at].strip()
@@ -49,6 +66,57 @@ def _parse_mixed(text: str) -> list[tuple[str, str]]:
         pairs.append((spelling, gloss))
         remaining = remaining.strip()
     return pairs
+
+
+def _parse_one_pair(text: str) -> tuple[str, str]:
+    dash_at, dash_len = _first_dash(text)
+    equals_at = text.find("=")
+    if dash_at == -1 and equals_at == -1:
+        raise ValueError(f"need a word and a meaning: {text!r}")
+    if equals_at != -1 and (dash_at == -1 or equals_at < dash_at):
+        spelling = text[:equals_at].strip()
+        gloss = text[equals_at + 1 :].strip()
+        if not spelling or not gloss:
+            raise ValueError(f"need a word and a meaning: {text!r}")
+        return spelling, gloss
+    left = text[:dash_at].strip()
+    right = text[dash_at + dash_len :].strip()
+    if not left or not right:
+        raise ValueError(f"need a word and a meaning: {text!r}")
+    if _arabizi_first(left, right):
+        return left, right
+    spelling, _, leftover = right.partition(" ")
+    if leftover.strip():
+        # English - arabizi only takes one spelling token; leftover means they
+        # wrote arabizi - multi-word English without a digit on the left.
+        return left, right
+    if not spelling:
+        raise ValueError(f"need a word and a meaning: {text!r}")
+    return spelling, left
+
+
+def _arabizi_first(left: str, right: str) -> bool:
+    """True when the dash line is spelling on the left, meaning on the right."""
+    if _has_arabizi_digit(left):
+        return True
+    first_right = right.split()[0] if right.split() else ""
+    if _has_arabizi_digit(first_right):
+        return False
+    if any(char.isspace() for char in right):
+        return True
+    return False
+
+
+def _separator_count(text: str) -> int:
+    count = text.count("=")
+    cursor = 0
+    while True:
+        at, width = _first_dash(text[cursor:])
+        if at == -1:
+            break
+        count += 1
+        cursor += at + max(width, 1)
+    return count
 
 
 def _cut_equals_gloss(right: str) -> tuple[str, str]:
@@ -78,9 +146,12 @@ def _has_arabizi_digit(token: str) -> bool:
 
 def _first_dash(text: str) -> tuple[int, int]:
     found = [(text.find(sep), len(sep)) for sep in _DASHES if text.find(sep) != -1]
-    if not found:
-        return -1, 0
-    return min(found)
+    if found:
+        return min(found)
+    tight = _TIGHT_DASH.search(text)
+    if tight:
+        return tight.start(2), 1
+    return -1, 0
 
 
 def item_kind(spelling: str) -> str:

@@ -79,6 +79,27 @@ class IntakeTests(unittest.TestCase):
             ],
         )
 
+    def test_arabizi_dash_english_keeps_the_whole_meaning(self) -> None:
+        pairs = parse_lesson_text(
+            "6awaret - i developed (something else)\n"
+            "et6awaret - I developed (my self)\n"
+            "eb7as - to search\n"
+            "a3od warra al shasheh- sit behind a screen\n"
+            "2esme - divide\n"
+            "bayanat = Data\n"
+        )
+        self.assertEqual(
+            pairs,
+            [
+                ("6awaret", "i developed (something else)"),
+                ("et6awaret", "I developed (my self)"),
+                ("eb7as", "to search"),
+                ("a3od warra al shasheh", "sit behind a screen"),
+                ("2esme", "divide"),
+                ("bayanat", "Data"),
+            ],
+        )
+
 
 class NotebookTests(unittest.TestCase):
     def setUp(self) -> None:
