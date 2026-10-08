@@ -3,12 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+  <meta name="theme-color" content="#f2f2f7">
   <title>Sawt</title>
+  <script>
+    (function () {
+      const saved = localStorage.getItem("appearance");
+      const appearance = saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+      const dark = appearance === "dark" || (appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    })();
+  </script>
   <style>
-    :root {
-      color-scheme: light dark;
+    :root,
+    :root[data-theme="light"] {
+      color-scheme: light;
       --label: #000000;
       --secondary: rgba(60, 60, 67, 0.6);
       --tertiary: rgba(60, 60, 67, 0.3);
@@ -26,29 +35,48 @@
       --field: #ffffff;
       --switch-off: #e9e9ea;
       --knob: #ffffff;
+      --card-canvas: #f7f8fc;
+      --card-surface: rgba(255, 255, 255, 0.94);
+      --card-border: rgba(15, 23, 42, 0.09);
+      --card-shadow: 0 24px 70px rgba(30, 45, 72, 0.10), 0 2px 8px rgba(30, 45, 72, 0.05);
+      --card-paper: #fffdf8;
+      --card-paper-back: #efeae2;
+      --card-edge: rgba(62, 48, 32, 0.16);
+      --card-lift: 0 18px 36px rgba(40, 32, 20, 0.14), 0 2px 6px rgba(40, 32, 20, 0.06);
+      --accent-soft: rgba(0, 122, 255, 0.09);
+      --success-soft: rgba(36, 138, 61, 0.10);
       --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
       --reading: ui-serif, "New York", "Iowan Old Style", Palatino, serif;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --label: #ffffff;
-        --secondary: rgba(235, 235, 245, 0.6);
-        --tertiary: rgba(235, 235, 245, 0.3);
-        --separator: #38383a;
-        --blue: #0a84ff;
-        --blue-text: #409cff;
-        --green: #30d158;
-        --switch: #30d158;
-        --orange: #ff9f0a;
-        --red: #ff453a;
-        --grouped: #000000;
-        --fill: #2c2c2e;
-        --fill-pressed: #3a3a3c;
-        --window: #1c1c1e;
-        --field: #2c2c2e;
-        --switch-off: #39393d;
-        --knob: #ffffff;
-      }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --label: #ffffff;
+      --secondary: rgba(235, 235, 245, 0.6);
+      --tertiary: rgba(235, 235, 245, 0.3);
+      --separator: #38383a;
+      --blue: #0a84ff;
+      --blue-text: #409cff;
+      --green: #30d158;
+      --switch: #30d158;
+      --orange: #ff9f0a;
+      --red: #ff453a;
+      --grouped: #000000;
+      --fill: #2c2c2e;
+      --fill-pressed: #3a3a3c;
+      --window: #1c1c1e;
+      --field: #2c2c2e;
+      --switch-off: #39393d;
+      --knob: #ffffff;
+      --card-canvas: #111113;
+      --card-surface: rgba(35, 35, 38, 0.96);
+      --card-border: rgba(255, 255, 255, 0.10);
+      --card-shadow: 0 30px 80px rgba(0, 0, 0, 0.36), 0 2px 8px rgba(0, 0, 0, 0.24);
+      --card-paper: #3a3a3c;
+      --card-paper-back: #2a2a2c;
+      --card-edge: rgba(255, 255, 255, 0.16);
+      --card-lift: 0 22px 44px rgba(0, 0, 0, 0.46), 0 2px 8px rgba(0, 0, 0, 0.28);
+      --accent-soft: rgba(10, 132, 255, 0.15);
+      --success-soft: rgba(48, 209, 88, 0.13);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -341,23 +369,31 @@
     .toolbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
     .sky {
       position: relative;
-      width: 18px;
-      height: 18px;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
       color: var(--label);
+      cursor: pointer;
     }
+    .sky:hover { background: var(--fill); }
+    .sky:active { background: var(--fill-pressed); }
     .sky svg {
       position: absolute;
-      inset: 0;
+      left: 50%;
+      top: 50%;
       width: 18px;
       height: 18px;
+      margin: -9px 0 0 -9px;
       transition: opacity 0.2s ease;
     }
     .sky .sun { color: #ffcc00; }
     .sky .moon { opacity: 0; }
-    @media (prefers-color-scheme: dark) {
-      .sky .sun { opacity: 0; }
-      .sky .moon { opacity: 1; }
-    }
+    :root[data-theme="dark"] .sky .sun { opacity: 0; }
+    :root[data-theme="dark"] .sky .moon { opacity: 1; }
     .recent { margin-top: 48px; }
     .recent[hidden] { display: none; }
     .recent h2 { margin-bottom: 4px; }
@@ -424,15 +460,13 @@
     }
     .orb i:nth-child(2) { background: #5ac8fa; left: 8%; top: 34%; }
     .orb i:nth-child(3) { background: #ffffff; left: 30%; top: 8%; opacity: 0.7; }
-    @media (prefers-color-scheme: dark) {
-      .orb {
-        background: #0b0b0d;
-        box-shadow: none;
-      }
-      .orb i { background: #0a84ff; opacity: 0.9; }
-      .orb i:nth-child(2) { background: #64d2ff; }
-      .orb i:nth-child(3) { background: #ffffff; opacity: 0.55; }
+    :root[data-theme="dark"] .orb {
+      background: #0b0b0d;
+      box-shadow: none;
     }
+    :root[data-theme="dark"] .orb i { background: #0a84ff; opacity: 0.9; }
+    :root[data-theme="dark"] .orb i:nth-child(2) { background: #64d2ff; }
+    :root[data-theme="dark"] .orb i:nth-child(3) { background: #ffffff; opacity: 0.55; }
     .voice-state { margin: 0; font-size: 13px; color: var(--secondary); }
     .voice-line {
       margin: 0;
@@ -668,12 +702,486 @@
       font-size: 13px;
     }
     .checklist-empty:empty { display: none; }
+    #pane-cards:not([hidden]) {
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 50% -20%, var(--accent-soft), transparent 42%),
+        var(--card-canvas);
+    }
+    #cards-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .cards-home { max-width: 660px; width: 100%; margin: 0 auto; }
+    .cards-home-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 4px 0 34px;
+    }
+    .cards-home-title h2 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 36px);
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+    .cards-home-title .hint { max-width: 380px; margin: 0; font-size: 14px; line-height: 1.5; }
+    .cards-home-header .primary { min-height: 36px; padding-inline: 16px; flex-shrink: 0; }
+    .cards-home-header-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+    .cards-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 32px;
+      margin-left: -7px;
+      padding: 4px 7px;
+      border-radius: 7px;
+    }
+    .cards-back:hover { background: var(--fill); }
+    .cards-back svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .cards-loading { margin-top: 18px; }
+    .cards-group { margin-top: 26px; }
+    .cards-group h3 {
+      margin: 0 2px 5px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--secondary);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .cards-group .hint { margin-bottom: 12px; }
+    .deck-list, .cards-words {
+      list-style: none;
+      margin: 0 0 12px;
+      padding: 0;
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(30, 45, 72, 0.03);
+    }
+    .deck-row, .cards-word {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 62px;
+      padding: 11px 14px;
+      border: 0;
+      border-bottom: 1px solid var(--card-border);
+      background: transparent;
+      text-align: left;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .deck-row:last-child, .cards-word:last-child { border-bottom: 0; }
+    .deck-row:hover, .cards-word:hover { background: var(--fill); }
+    .deck-row:active { transform: scale(0.995); }
+    .deck-symbol {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 36px;
+      display: grid;
+      place-items: center;
+      color: var(--blue-text);
+      background: var(--accent-soft);
+      border-radius: 10px;
+    }
+    .deck-symbol svg { width: 18px; height: 18px; }
+    .deck-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .deck-name, .cards-word-spell {
+      font-size: 17px;
+      line-height: 1.25;
+    }
+    .deck-source { color: var(--secondary); font-size: 12px; }
+    .deck-due {
+      margin-left: auto;
+      color: var(--blue-text);
+      background: var(--accent-soft);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .deck-due.is-clear { color: var(--secondary); background: var(--fill); }
+    .deck-chevron { width: 15px; height: 15px; color: var(--tertiary); flex-shrink: 0; }
+    .cards-empty-group {
+      margin: 0;
+      padding: 16px;
+      color: var(--secondary);
+      background: color-mix(in srgb, var(--card-surface) 78%, transparent);
+      border: 1px dashed var(--card-border);
+      border-radius: 14px;
+      font-size: 13px;
+    }
+    .cards-word-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .cards-word-gloss { color: var(--secondary); font-size: 13px; }
+    .cards-check { width: 22px; height: 22px; color: var(--tertiary); flex-shrink: 0; }
+    .cards-check svg { width: 22px; height: 22px; display: block; }
+    .cards-word[aria-pressed="true"] .cards-check { color: var(--blue); }
+    .cards-words { max-height: min(420px, 52vh); overflow: auto; }
+    .cards-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .cards-import {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 30px;
+      padding: 16px 18px;
+      color: var(--secondary);
+      background: color-mix(in srgb, var(--card-surface) 76%, transparent);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+    }
+    .cards-import-copy { min-width: 0; }
+    .cards-import-copy strong { display: block; margin-bottom: 2px; color: var(--label); font-size: 14px; }
+    .cards-import-copy span { font-size: 12px; }
+    .cards-import .cards-actions { flex-shrink: 0; margin: 0; }
+    .cards-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+    .cards-study {
+      flex: 1;
+      width: min(680px, 100%);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 0 0 28px;
+    }
+    .cards-study-top {
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .cards-study-top .text {
+      min-height: 28px;
+      padding: 4px 7px;
+      margin-left: -7px;
+      border-radius: 7px;
+    }
+    .cards-study-top .back-label { font-size: 14px; }
+    .cards-study-top .text:hover { background: var(--fill); }
+    .study-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: min(260px, 48%);
+    }
+    .study-progress-track {
+      flex: 1;
+      height: 4px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: var(--fill);
+    }
+    .study-progress-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+      transition: width 0.25s ease;
+    }
+    .study-progress .cards-kicker { min-width: 74px; text-align: right; }
+    .study-heading { width: 100%; margin-bottom: 16px; text-align: center; }
+    .study-heading .kicker { margin-bottom: 5px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .study-heading h2 { font-size: 18px; letter-spacing: -0.01em; }
+    .card-stack {
+      position: relative;
+      width: min(440px, 100%);
+      margin: 6px auto 0;
+    }
+    .card-under {
+      position: absolute;
+      z-index: 0;
+      inset: 12px 18px -10px;
+      border: 1px solid var(--card-edge);
+      border-radius: 16px;
+      background: var(--card-paper-back);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+      transform: rotate(1.6deg);
+      pointer-events: none;
+    }
+    .card-face {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--card-edge);
+      border-radius: 18px;
+      background: var(--card-paper);
+      box-shadow: var(--card-lift), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      padding: 48px 32px 56px;
+      text-align: center;
+    }
+    .card-face.is-question { animation: card-arrive 0.2s ease-out both; }
+    .card-face.is-question:hover { transform: translateY(-2px); }
+    .card-face.is-question:active { transform: translateY(0); }
+    .card-eyebrow {
+      position: absolute;
+      top: 22px;
+      left: 0;
+      right: 0;
+      margin: 0;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .card-front {
+      margin: 0;
+      font-family: var(--reading);
+      font-size: clamp(34px, 6vw, 52px);
+      font-weight: 500;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      overflow-wrap: anywhere;
+    }
+    .card-divider {
+      width: 36px;
+      height: 1px;
+      margin: 28px auto 0;
+      border: 0;
+      background: var(--separator);
+    }
+    .card-back {
+      margin: 24px 0 0;
+      font-family: var(--reading);
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 500;
+      line-height: 1.35;
+      color: var(--secondary);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .card-show {
+      position: absolute;
+      bottom: 22px;
+      margin: 0;
+      color: var(--secondary);
+      font-family: var(--ui);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .card-show-key { margin-left: 7px; color: var(--secondary); font-size: 11px; font-weight: 600; }
+    .grade-prompt { margin: 24px 0 10px; color: var(--secondary); font-size: 12px; font-weight: 600; }
+    .card-grades {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      width: min(360px, 100%);
+    }
+    .card-grades button {
+      position: relative;
+      min-height: 62px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      background: var(--card-surface);
+      padding: 9px 7px;
+      transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+    }
+    .card-grades button:hover { border-color: var(--separator); transform: translateY(-1px); }
+    .card-grades button:active { background: var(--fill-pressed); transform: translateY(0); }
+    .card-grades button.grade-primary { background: var(--success-soft); border-color: color-mix(in srgb, var(--green) 24%, transparent); }
+    .card-grades button:disabled { opacity: 0.45; }
+    .grade-key {
+      position: absolute;
+      top: 6px;
+      right: 7px;
+      color: var(--tertiary);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .grade-name { display: block; font-size: 14px; font-weight: 650; }
+    .grade-again { color: var(--red); }
+    .grade-hard { color: var(--orange); }
+    .grade-good { color: var(--green); }
+    .grade-easy { color: var(--blue-text); }
+    .grade-interval {
+      display: block;
+      margin-top: 2px;
+      color: var(--secondary);
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .cards-study-links {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-top: 24px;
+    }
+    .cards-study-links button {
+      border: 0;
+      background: transparent;
+      color: var(--blue-text);
+      font-weight: 600;
+      padding: 4px 2px;
+    }
+    .cards-study-links .danger { color: var(--red); }
+    .cards-kicker { margin: 0; }
+    .cards-empty-study {
+      width: 100%;
+      padding: 58px 24px;
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      background: var(--card-surface);
+      box-shadow: var(--card-shadow);
+      text-align: center;
+    }
+    .cards-empty-mark {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 16px;
+      color: var(--green);
+      background: var(--success-soft);
+      border-radius: 50%;
+    }
+    .cards-empty-mark svg { width: 24px; height: 24px; }
+    .cards-empty-study h3 { margin: 0 0 7px; font-size: 20px; }
+    .cards-empty-study .hint { margin: 0; font-size: 14px; }
+    @keyframes card-arrive {
+      from { opacity: 0; transform: translateY(5px) scale(0.995); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .cards-timer {
+      font-variant-numeric: tabular-nums;
+      min-width: 3.2ch;
+      text-align: right;
+    }
+    .study-progress .cards-timer { min-width: 3.2ch; color: var(--secondary); }
+    .cards-choice .cards-check { margin-left: auto; color: var(--blue); }
+    .cards-preview {
+      position: relative;
+      width: min(340px, 100%);
+      margin: 0 auto;
+      background: var(--card-paper);
+      border: 1px solid var(--card-edge);
+      border-radius: 18px;
+      box-shadow: var(--card-lift), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      padding: 32px 20px 26px;
+      text-align: center;
+    }
+    .cards-preview::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 10px 14px -8px;
+      border: 1px solid var(--card-edge);
+      border-radius: 16px;
+      background: var(--card-paper-back);
+      transform: rotate(1.4deg);
+    }
+    .cards-preview .card-front { font-size: clamp(26px, 4vw, 34px); }
+    .cards-preview .card-back { margin-top: 8px; }
+    .cards-setting {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 62px;
+      padding: 14px 16px;
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 1px 2px rgba(30, 45, 72, 0.03);
+    }
+    .cards-setting-copy { flex: 1; min-width: 0; }
+    .cards-setting-title { margin: 0; font-size: 17px; font-weight: 400; }
+    .cards-setting .hint { margin: 2px 0 0; }
+    .cards-number {
+      width: 56px;
+      min-height: 36px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: var(--fill);
+      color: var(--label);
+      font: inherit;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+      padding: 6px 4px;
+      flex-shrink: 0;
+      -moz-appearance: textfield;
+    }
+    .cards-number::-webkit-outer-spin-button,
+    .cards-number::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .cards-number:focus {
+      outline: none;
+      border-color: color-mix(in srgb, var(--blue) 55%, var(--card-border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent);
+    }
+    .cards-number:disabled { opacity: 0.45; }
+    .cards-stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .cards-stepper button {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: var(--fill);
+      color: var(--label);
+      font: inherit;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0;
+    }
+    .cards-stepper button:hover { background: var(--fill-pressed); }
+    .cards-stepper button:disabled { opacity: 0.4; }
+    .cards-switch {
+      width: 51px;
+      height: 31px;
+      border: 0;
+      border-radius: 16px;
+      background: var(--switch-off);
+      padding: 2px;
+      flex-shrink: 0;
+    }
+    .cards-switch span {
+      display: block;
+      width: 27px;
+      height: 27px;
+      border-radius: 50%;
+      background: var(--knob);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+      transition: transform 0.2s ease;
+    }
+    .cards-switch[aria-checked="true"] { background: var(--switch); }
+    .cards-switch[aria-checked="true"] span { transform: translateX(20px); }
+    .cards-switch:disabled { opacity: 0.45; }
     @media (prefers-reduced-motion: reduce) {
       .checklist-toggle svg { transition: none; }
+      .cards-switch span { transition: none; }
+      .card-face.is-question { animation: none; }
+      .card-face.is-question:hover { transform: none; }
+      .study-progress-fill, .deck-row, .card-grades button { transition: none; }
     }
-    #language-setup .language-picks { margin-top: 12px; }
-    #language-setup .language-picks button { color: var(--label); background: var(--fill); }
-    #language-setup .language-picks button[aria-pressed="true"] { color: #ffffff; background: var(--blue); }
+    #language-setup .language-picks,
+    #appearance-setup .appearance-picks { margin-top: 12px; }
+    #language-setup .language-picks button,
+    #appearance-setup .appearance-picks button { color: var(--label); background: var(--fill); }
+    #language-setup .language-picks button[aria-pressed="true"],
+    #appearance-setup .appearance-picks button[aria-pressed="true"] { color: #ffffff; background: var(--blue); }
     #account-status { margin: 0 0 14px; }
     #calendar-setup { margin-top: 28px; }
     #calendar-setup[hidden] { display: none; }
@@ -710,9 +1218,32 @@
       }
       .sidebar-label { display: none; }
       .app-name { margin: 0 8px 0 4px; }
-      .sidebar nav { flex-direction: row; }
+      .sidebar nav { flex-direction: row; flex-wrap: wrap; }
       .tab { width: auto; }
       .search-wrap { width: min(220px, 46vw); }
+      #pane-cards { padding: 20px 16px 34px; }
+      .cards-home-header { align-items: flex-start; margin-bottom: 28px; }
+      .cards-home-title h2 { font-size: 30px; }
+      .cards-import { align-items: flex-start; flex-direction: column; }
+      .cards-study { justify-content: flex-start; }
+      .cards-study-top { margin-bottom: 22px; }
+      .study-progress { min-width: 52%; }
+      .card-face { min-height: 260px; border-radius: 16px; padding-inline: 22px; }
+      .cards-study-links { margin-top: 20px; }
+    }
+    @media (max-width: 460px) {
+      .cards-home-header { display: block; }
+      .cards-home-header-actions { margin-top: 18px; }
+      .cards-home-header .primary { min-height: 44px; flex: 1; }
+      .deck-row { padding-inline: 12px; }
+      .deck-source { display: none; }
+      .study-progress-track { display: none; }
+      .study-progress { min-width: auto; }
+      .card-face { min-height: 240px; }
+      .card-show { min-height: 38px; display: flex; align-items: center; }
+    }
+    @media (hover: none) {
+      .card-show-key, .grade-key { display: none; }
     }
   </style>
 </head>
@@ -741,6 +1272,10 @@
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h6.2A2.8 2.8 0 0 1 14 8.3V19a2.2 2.2 0 0 0-2.2-2.2H5V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 5.5h-6.2A2.8 2.8 0 0 0 10 8.3V19a2.2 2.2 0 0 1 2.2-2.2H19V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
           <span data-i18n="tabWords">Words</span>
         </button>
+        <button class="tab" type="button" data-tab="cards">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="3.5" width="12" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 7.5v11a2 2 0 0 0 2 2h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span data-i18n="tabCards">Cards</span>
+        </button>
         <button class="tab" type="button" data-tab="checklist">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M8 12.2l2.2 2.2L16 8.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span data-i18n="tabChecklist">Checklist</span>
@@ -762,15 +1297,15 @@
             </svg>
             <input id="search" type="search" data-i18n-placeholder="search" data-i18n-aria="search" placeholder="Search" aria-label="Search">
           </div>
-          <span class="sky" aria-hidden="true">
-            <svg class="sun" viewBox="0 0 18 18" fill="none">
+          <button id="theme-toggle" class="sky" type="button" aria-label="Switch to dark appearance">
+            <svg class="sun" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <circle cx="9" cy="9" r="3.15" stroke="currentColor" stroke-width="1.5"/>
               <path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.55 3.55l1.2 1.2M13.25 13.25l1.2 1.2M14.45 3.55l-1.2 1.2M4.75 13.25l-1.2 1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            <svg class="moon" viewBox="0 0 18 18">
+            <svg class="moon" viewBox="0 0 18 18" aria-hidden="true">
               <path fill="currentColor" d="M9.6 1.7a6.4 6.4 0 1 0 6.6 8.6A5.15 5.15 0 0 1 9.6 1.7Z"/>
             </svg>
-          </span>
+          </button>
           <button id="account-button" type="button" hidden>Sign in</button>
         </div>
       </header>
@@ -871,6 +1406,10 @@
           <div id="library"></div>
         </div>
 
+        <div id="pane-cards" class="pane" hidden>
+          <div id="cards-root"></div>
+        </div>
+
         <div id="pane-checklist" class="pane" hidden>
           <div class="checklist-shell">
             <h2 data-i18n="tabChecklist">Checklist</h2>
@@ -908,6 +1447,15 @@
               </div>
               <p id="language-error" class="error"></p>
             </section>
+            <section id="appearance-setup">
+              <h2 data-i18n="appearance">Appearance</h2>
+              <p class="hint" data-i18n="appearanceHint">Light and Dark stay put. Automatic follows your system setting.</p>
+              <div class="scenes appearance-picks" role="group" aria-label="Appearance">
+                <button type="button" class="secondary" data-appearance="light" data-i18n="appearanceLight">Light</button>
+                <button type="button" class="secondary" data-appearance="dark" data-i18n="appearanceDark">Dark</button>
+                <button type="button" class="secondary" data-appearance="system" data-i18n="appearanceSystem" aria-pressed="true">Automatic</button>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -944,6 +1492,7 @@
       tabToday: "Today",
       tabPractice: "Practice",
       tabWords: "Words",
+      tabCards: "Cards",
       tabChecklist: "Checklist",
       tabSettings: "Settings",
       checklistHint: "Light goals for this language. Tap the chevron for a note. Tick to move into Done — untick to bring it back.",
@@ -979,6 +1528,13 @@
       signIn: "Sign in",
       manageAccount: "Manage account",
       language: "Language you're learning",
+      appearance: "Appearance",
+      appearanceHint: "Light and Dark stay put. Automatic follows your system setting.",
+      appearanceLight: "Light",
+      appearanceDark: "Dark",
+      appearanceSystem: "Automatic",
+      switchToLight: "Switch to light appearance",
+      switchToDark: "Switch to dark appearance",
       calendar: "Calendar",
       calendarHint: "Paste the secret iCal address from Google Calendar.",
       icalLink: "iCal link",
@@ -1053,6 +1609,51 @@
     function t(key) {
       const mode = MODE[learningLanguage] || MODE.arabic;
       return mode[key] ?? UI[key] ?? key;
+    }
+
+    function getAppearance() {
+      const saved = localStorage.getItem("appearance");
+      return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+    }
+
+    function systemTheme() {
+      return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+
+    function resolvedTheme(appearance = getAppearance()) {
+      return appearance === "system" ? systemTheme() : appearance;
+    }
+
+    function syncAppearanceUI() {
+      const appearance = getAppearance();
+      const resolved = resolvedTheme(appearance);
+      document.querySelectorAll("[data-appearance]").forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          button.dataset.appearance === appearance ? "true" : "false",
+        );
+      });
+      const toggle = document.querySelector("#theme-toggle");
+      if (toggle) {
+        toggle.setAttribute(
+          "aria-label",
+          t(resolved === "dark" ? "switchToLight" : "switchToDark"),
+        );
+      }
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = resolved === "dark" ? "#000000" : "#f2f2f7";
+    }
+
+    function applyAppearance(appearance) {
+      const next =
+        appearance === "light" || appearance === "dark" || appearance === "system"
+          ? appearance
+          : "system";
+      localStorage.setItem("appearance", next);
+      const resolved = resolvedTheme(next);
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.style.colorScheme = resolved;
+      syncAppearanceUI();
     }
 
     function setBrandMark(language, { animate = false } = {}) {
@@ -1139,11 +1740,13 @@
           button.dataset.language === learningLanguage ? "true" : "false",
         );
       });
+      syncAppearanceUI();
       const activeTab = document.querySelector(".tab.active")?.dataset.tab || "today";
       const titleKeys = {
         today: "tabToday",
         practice: "tabPractice",
         words: "tabWords",
+        cards: "tabCards",
         checklist: "tabChecklist",
         settings: "tabSettings",
       };
@@ -1164,6 +1767,8 @@
         loadLibrary().catch(() => {});
         loadRecent().catch(() => {});
         renderChecklist();
+        cardsMode = "home";
+        if (!document.querySelector("#pane-cards").hidden) loadCardDecks();
       }
     }
 
@@ -1308,12 +1913,17 @@
         today: "tabToday",
         practice: "tabPractice",
         words: "tabWords",
+        cards: "tabCards",
         checklist: "tabChecklist",
         settings: "tabSettings",
       };
       document.querySelector("#toolbar-title").textContent = t(titleKeys[name] || "tabToday");
       document.querySelector(".search-wrap").hidden = name !== "words";
-      for (const tab of ["today", "practice", "words", "checklist", "settings"]) {
+      if (name !== "cards") {
+        clearCardWait();
+        stopCardClock();
+      }
+      for (const tab of ["today", "practice", "words", "cards", "checklist", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -1322,6 +1932,7 @@
         else button.removeAttribute("aria-current");
       }
       if (name === "checklist") renderChecklist();
+      if (name === "cards" && cardsMode === "home") loadCardDecks();
     }
 
     function checklistStorageKey() {
@@ -1533,6 +2144,878 @@
 
     document.querySelectorAll(".tab").forEach((button) => {
       button.addEventListener("click", () => showTab(button.dataset.tab));
+    });
+
+    let cardsMode = "home";
+    let cardsPayload = null;
+    let cardsRevealed = false;
+    let cardsBusy = false;
+    let cardsCompose = null;
+    let cardsError = "";
+    let cardsWaitTimer = null;
+    let cardsRequest = 0;
+    let cardsSettings = {
+      timer: false,
+      side: "word",
+      new_per_day: 20,
+      prompt_label: "Arabic",
+      answer_label: "English",
+      preview_prompt: "",
+      preview_answer: "",
+      preview_example: true,
+    };
+    let cardsSettingsBusy = false;
+    let cardsClock = null;
+    let cardsClockCard = null;
+    let cardsShownAt = 0;
+    let cardsSessionTotal = 0;
+    let cardsSessionDone = 0;
+
+    function clearCardWait() {
+      clearTimeout(cardsWaitTimer);
+      cardsWaitTimer = null;
+    }
+
+    function stopCardClock() {
+      clearInterval(cardsClock);
+      cardsClock = null;
+      cardsClockCard = null;
+    }
+
+    function rememberCardSettings(settings) {
+      if (!settings) return;
+      cardsSettings = Object.assign({}, cardsSettings, settings);
+    }
+
+    function paintCardClock() {
+      const el = document.querySelector("#card-timer");
+      if (!el) return;
+      const seconds = Math.max(0, Math.floor((Date.now() - cardsShownAt) / 1000));
+      const minutes = Math.floor(seconds / 60);
+      el.textContent = minutes + ":" + String(seconds % 60).padStart(2, "0");
+    }
+
+    function syncCardClock(cardId) {
+      if (!cardsSettings.timer || !cardId || !document.querySelector("#card-timer")) {
+        stopCardClock();
+        return;
+      }
+      if (cardsClockCard !== cardId) {
+        cardsClockCard = cardId;
+        cardsShownAt = Date.now();
+      }
+      paintCardClock();
+      if (cardsClock == null) cardsClock = setInterval(paintCardClock, 1000);
+    }
+
+    function node(tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text != null) element.textContent = text;
+      return element;
+    }
+
+    function cardBackButton() {
+      const back = node("button", "text cards-back");
+      back.type = "button";
+      back.setAttribute("aria-label", "Back to decks");
+      back.innerHTML = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.75 3.25 5 8l4.75 4.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Decks</span>';
+      back.onclick = () => loadCardDecks();
+      return back;
+    }
+
+    function renderCardsLoading(message) {
+      const root = document.querySelector("#cards-root");
+      const page = node("div", "cards-home");
+      page.append(cardBackButton());
+      page.append(node("p", "hint cards-loading", message));
+      root.replaceChildren(page);
+    }
+
+    async function loadCardDecks() {
+      cardsMode = "home";
+      cardsPayload = null;
+      cardsBusy = false;
+      clearCardWait();
+      stopCardClock();
+      const requestId = ++cardsRequest;
+      const root = document.querySelector("#cards-root");
+      let data;
+      try {
+        const response = await apiFetch("/api/cards");
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load decks.");
+      } catch (err) {
+        if (requestId !== cardsRequest) return;
+        root.replaceChildren(node("p", "error", err.message || "Could not load decks."));
+        return;
+      }
+      if (requestId !== cardsRequest) return;
+      rememberCardSettings(data.settings);
+      renderCardHome(data);
+    }
+
+    function renderCardHome(data) {
+      const root = document.querySelector("#cards-root");
+      root.replaceChildren();
+      const home = node("div", "cards-home");
+      const head = node("div", "cards-home-header");
+      const title = node("div", "cards-home-title");
+      title.append(node("h2", null, "Cards"));
+      title.append(node("p", "hint", "Study words you saved, or import an Anki deck."));
+      const actions = node("div", "cards-home-header-actions");
+      const settings = node("button", "text", "Settings");
+      settings.type = "button";
+      settings.onclick = () => openCardSettings();
+      actions.append(settings);
+      head.append(title, actions);
+      home.append(head);
+      const error = node("p", "error", cardsError);
+      home.append(error);
+      cardsError = "";
+
+      rememberCardSettings(data.settings);
+      home.append(newCardsControl({
+        onSaved: () => loadCardDecks(),
+        hint: "How many unseen words to start each day. Reviews stay unlimited.",
+      }));
+
+      const words = data.words || [];
+      const wordsGroup = node("section", "cards-group");
+      wordsGroup.append(node("h3", null, "Your words"));
+      wordsGroup.append(node(
+        "p",
+        "hint",
+        "Uses every word from Words. New words are added automatically.",
+      ));
+      if (words.length) {
+        wordsGroup.append(deckList(words));
+      } else if (data.has_words) {
+        const start = node("button", "primary", "Study your words");
+        start.type = "button";
+        start.onclick = () => startWordsDeck();
+        const row = node("div", "cards-actions");
+        row.append(start);
+        wordsGroup.append(row);
+      } else {
+        wordsGroup.append(node(
+          "p",
+          "cards-empty-group",
+          "Save words on the Words tab — they’ll show up here on their own.",
+        ));
+      }
+      home.append(wordsGroup);
+
+      home.append(deckGroup("Anki", "Imported decks keep their own scheduling.", data.anki || []));
+      const file = document.createElement("input");
+      file.type = "file";
+      file.className = "cards-file";
+      file.accept = ".apkg";
+      file.id = "cards-apkg";
+      const pick = node("button", "secondary", "Import an Anki deck");
+      pick.type = "button";
+      pick.onclick = () => file.click();
+      file.onchange = async () => {
+        const chosen = file.files && file.files[0];
+        file.value = "";
+        if (!chosen) return;
+        pick.disabled = true;
+        pick.textContent = "Importing…";
+        error.textContent = "";
+        try {
+          const bytes = await chosen.arrayBuffer();
+          const response = await apiFetch("/api/cards?action=import", {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: bytes,
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || "Could not read that deck.");
+          if (payload.decks && payload.decks.length === 1) {
+            await openCardStudy(payload.decks[0].id);
+            return;
+          }
+          await loadCardDecks();
+        } catch (err) {
+          cardsError = err.message;
+          await loadCardDecks();
+        }
+      };
+      const row = node("div", "cards-actions");
+      row.append(pick, file);
+      const importPanel = node("div", "cards-import");
+      const importCopy = node("div", "cards-import-copy");
+      importCopy.append(node("strong", null, "Or import Anki"));
+      importCopy.append(node("span", null, "Bring an .apkg file. It stays separate from your Words deck."));
+      importPanel.append(importCopy, row);
+      home.append(importPanel);
+      root.append(home);
+    }
+
+    async function startWordsDeck() {
+      try {
+        const payload = await post("/api/cards", { name: "My Words", item_ids: [] });
+        cardsMode = "study";
+        cardsRevealed = false;
+        cardsPayload = payload;
+        cardsSessionTotal = payload.due || 0;
+        cardsSessionDone = 0;
+        rememberCardSettings(payload.settings);
+        renderCardStudy();
+      } catch (err) {
+        cardsError = err.message;
+        await loadCardDecks();
+      }
+    }
+
+    function deckGroup(title, hint, decks) {
+      const group = node("section", "cards-group");
+      group.append(node("h3", null, title));
+      group.append(node("p", "hint", hint));
+      if (!decks.length) {
+        group.append(node("p", "cards-empty-group", "No imported decks yet."));
+        return group;
+      }
+      group.append(deckList(decks));
+      return group;
+    }
+
+    function deckList(decks) {
+      const list = node("div", "deck-list");
+      for (const deck of decks) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "deck-row";
+        const symbol = node("span", "deck-symbol");
+        symbol.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="4" width="12" height="15" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M5 8v10a2 2 0 0 0 2 2h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+        const copy = node("span", "deck-copy");
+        const name = node("span", "deck-name", deck.name);
+        const source = node(
+          "span",
+          "deck-source",
+          deck.source === "anki" ? "Imported deck" : "Updates when you save words",
+        );
+        copy.append(name, source);
+        const due = node("span", "deck-due", deck.due ? deck.due + " due" : "Up to date");
+        if (!deck.due) due.classList.add("is-clear");
+        const chevron = node("span", "deck-chevron");
+        chevron.innerHTML = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        button.append(symbol, copy, due, chevron);
+        button.onclick = () => openCardStudy(deck.id);
+        list.append(button);
+      }
+      return list;
+    }
+
+    async function openCardStudy(deckId) {
+      cardsMode = "study";
+      cardsRevealed = false;
+      clearCardWait();
+      stopCardClock();
+      const requestId = ++cardsRequest;
+      renderCardsLoading("Loading deck…");
+      try {
+        const response = await apiFetch("/api/cards?id=" + encodeURIComponent(deckId));
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not open that deck.");
+        if (requestId !== cardsRequest) return;
+        cardsPayload = payload;
+        cardsSessionTotal = payload.due || 0;
+        cardsSessionDone = 0;
+        rememberCardSettings(payload.settings);
+        renderCardStudy();
+      } catch (err) {
+        if (requestId !== cardsRequest) return;
+        cardsError = err.message;
+        await loadCardDecks();
+      }
+    }
+
+    function renderCardStudy() {
+      const payload = cardsPayload;
+      const root = document.querySelector("#cards-root");
+      root.replaceChildren();
+      const study = node("div", "cards-study");
+      rememberCardSettings(payload.settings);
+      const top = node("div", "cards-study-top");
+      const back = cardBackButton();
+      back.classList.add("back-label");
+      const progress = node("div", "study-progress");
+      if (cardsSettings.timer && payload.card) {
+        const timer = node("p", "hint cards-kicker cards-timer", "0:00");
+        timer.id = "card-timer";
+        progress.append(timer);
+      }
+      const track = node("span", "study-progress-track");
+      const fill = node("span", "study-progress-fill");
+      const percent = cardsSessionTotal ? Math.min(100, (cardsSessionDone / cardsSessionTotal) * 100) : (payload.card ? 0 : 100);
+      fill.style.width = percent + "%";
+      track.append(fill);
+      const count = node("p", "hint cards-kicker", studyStatus(payload));
+      count.setAttribute("aria-live", "polite");
+      progress.append(track, count);
+      top.append(back, progress);
+      study.append(top);
+      const heading = node("div", "study-heading");
+      heading.append(node("p", "kicker", payload.deck.source === "anki" ? "Anki deck" : "Your words · auto-updates"));
+      heading.append(node("h2", null, payload.deck.name));
+      study.append(heading);
+      if (!payload.card) {
+        const empty = node("div", "cards-empty-study");
+        const mark = node("div", "cards-empty-mark");
+        mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 12.5 4 4L18.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        empty.append(mark);
+        empty.append(node("h3", null, payload.later_label ? "Review complete for now" : "You’re all caught up"));
+        empty.append(node("p", "hint", emptyStudyCopy(payload)));
+        if (payload.new_tomorrow) {
+          const more = node("div", "cards-actions");
+          for (const count of [10, 20]) {
+            const button = node("button", count === 20 ? "primary" : "secondary", "Learn " + count + " more");
+            button.type = "button";
+            button.disabled = cardsBusy;
+            button.onclick = () => learnMore(payload.deck.id, count);
+            more.append(button);
+          }
+          empty.append(more);
+        }
+        study.append(empty);
+      }
+      if (payload.card) {
+        const face = document.createElement(cardsRevealed ? "div" : "button");
+        if (!cardsRevealed) face.type = "button";
+        face.className = "card-face";
+        if (!cardsRevealed) face.classList.add("is-question");
+        face.append(node("p", "card-eyebrow", cardsRevealed ? "Answer" : "Recall"));
+        const front = node("p", "card-front", payload.card.front);
+        front.dir = "auto";
+        face.append(front);
+        if (!cardsRevealed) {
+          face.setAttribute("aria-label", "Show answer for " + payload.card.front);
+          const show = node("span", "card-show", "Show answer");
+          show.append(node("span", "card-show-key", "Space"));
+          face.append(show);
+          face.onclick = () => {
+            cardsRevealed = true;
+            renderCardStudy();
+          };
+        } else {
+          face.append(node("hr", "card-divider"));
+          const backText = node("p", "card-back", payload.card.back || "");
+          backText.dir = "auto";
+          face.append(backText);
+        }
+        const stack = node("div", "card-stack");
+        const under = node("div", "card-under");
+        under.setAttribute("aria-hidden", "true");
+        stack.append(under, face);
+        study.append(stack);
+        if (cardsRevealed) {
+          study.append(node("p", "grade-prompt", "How well did you remember?"));
+          const grades = node("div", "card-grades");
+          grades.setAttribute("role", "group");
+          grades.setAttribute("aria-label", "How well did you remember?");
+          const tone = { 1: "grade-again", 2: "grade-hard", 3: "grade-good", 4: "grade-easy" };
+          for (const button of payload.card.buttons.filter((choice) => choice.rating === 1 || choice.rating === 3)) {
+            const grade = document.createElement("button");
+            grade.type = "button";
+            grade.className = button.rating === 3 ? "grade-primary" : "";
+            grade.disabled = cardsBusy;
+            grade.setAttribute("aria-keyshortcuts", String(button.rating));
+            const key = node("span", "grade-key", String(button.rating));
+            const name = node("span", "grade-name " + tone[button.rating], button.label);
+            const interval = node("span", "grade-interval", button.interval);
+            grade.append(key, name, interval);
+            grade.onclick = () => answerCurrent(button.rating);
+            grades.append(grade);
+          }
+          study.append(grades);
+        }
+        if (!cardsRevealed) face.focus();
+      }
+      if (payload.deck.source === "words") {
+        const links = node("div", "cards-study-links");
+        links.append(node("p", "hint", "New words from Words join this deck automatically."));
+        study.append(links);
+      }
+      const studyError = node("p", "error");
+      studyError.id = "cards-study-error";
+      study.append(studyError);
+      root.append(study);
+      scheduleCardWait(payload);
+      syncCardClock(payload.card ? payload.card.id : null);
+    }
+
+    function studyStatus(payload) {
+      if (payload.due) {
+        const left = payload.new_left;
+        if (left != null && payload.new_per_day != null) {
+          return payload.due + " due · " + payload.new_done + "/" + payload.new_per_day + " new";
+        }
+        return payload.due + " due";
+      }
+      if (payload.later_label) return "Next in " + payload.later_label;
+      return "";
+    }
+
+    function emptyStudyCopy(payload) {
+      const limit = payload.new_per_day ?? cardsSettings.new_per_day ?? 20;
+      if (payload.new_tomorrow) {
+        return "You've learned today's " + limit + " new word" + (limit === 1 ? "" : "s")
+          + ". Keep going with more, or come back tomorrow.";
+      }
+      if (payload.later_label) return "Next card in " + payload.later_label + ".";
+      return "No cards due.";
+    }
+
+    function newCardsControl(options) {
+      const settings = cardsSettings;
+      const group = node("section", "cards-group");
+      group.append(node("h3", null, "New cards / day"));
+      group.append(node("p", "hint", options.hint || "How many unseen words to start each day."));
+      const row = node("div", "cards-setting");
+      const copy = node("div", "cards-setting-copy");
+      copy.append(node("p", "cards-setting-title", "Learn up to"));
+      copy.append(node("p", "hint", "Change this any time — it applies to today's queue."));
+      const stepper = node("div", "cards-stepper");
+      const minus = document.createElement("button");
+      minus.type = "button";
+      minus.textContent = "−";
+      minus.setAttribute("aria-label", "Fewer new cards");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.className = "cards-number";
+      input.min = "0";
+      input.max = "999";
+      input.step = "1";
+      input.value = String(settings.new_per_day ?? 20);
+      input.setAttribute("aria-label", "New cards per day");
+      const plus = document.createElement("button");
+      plus.type = "button";
+      plus.textContent = "+";
+      plus.setAttribute("aria-label", "More new cards");
+      const syncDisabled = () => {
+        const value = Number(input.value);
+        minus.disabled = cardsSettingsBusy || value <= 0;
+        plus.disabled = cardsSettingsBusy || value >= 999;
+        input.disabled = cardsSettingsBusy;
+      };
+      const commit = async (raw) => {
+        const next = Math.max(0, Math.min(999, Math.round(Number(raw))));
+        if (!Number.isFinite(next)) {
+          input.value = String(settings.new_per_day ?? 20);
+          syncDisabled();
+          return;
+        }
+        input.value = String(next);
+        syncDisabled();
+        if (next === settings.new_per_day) return;
+        await saveCardSettings({ new_per_day: next });
+        if (options.onSaved) options.onSaved();
+      };
+      minus.onclick = () => commit(Number(input.value) - 1);
+      plus.onclick = () => commit(Number(input.value) + 1);
+      input.onchange = () => commit(input.value);
+      stepper.append(minus, input, plus);
+      row.append(copy, stepper);
+      group.append(row);
+      syncDisabled();
+      return group;
+    }
+
+    function scheduleCardWait(payload) {
+      clearCardWait();
+      if (payload.card || payload.later == null || payload.later > 3600) return;
+      cardsWaitTimer = setTimeout(() => {
+        if (cardsMode === "study" && cardsPayload && cardsPayload.deck.id === payload.deck.id) {
+          openCardStudy(payload.deck.id);
+        }
+      }, (payload.later + 1) * 1000);
+    }
+
+    function learnMore(deckId, count) {
+      if (cardsBusy) return;
+      cardsBusy = true;
+      renderCardStudy();
+      post("/api/cards?id=" + encodeURIComponent(deckId) + "&action=more", { count }).then((payload) => {
+        cardsBusy = false;
+        if (cardsMode !== "study") return;
+        cardsRevealed = false;
+        cardsPayload = payload;
+        cardsSessionTotal = cardsSessionDone + (payload.due || 0);
+        renderCardStudy();
+      }).catch((err) => {
+        cardsBusy = false;
+        renderCardStudy();
+        const error = document.querySelector("#cards-study-error");
+        if (error) error.textContent = err.message;
+      });
+    }
+
+    function answerCurrent(rating) {
+      if (!cardsPayload || !cardsPayload.card || cardsBusy || !cardsRevealed) return;
+      cardsBusy = true;
+      const deckId = cardsPayload.deck.id;
+      const cardId = cardsPayload.card.id;
+      renderCardStudy();
+      post("/api/cards?id=" + encodeURIComponent(deckId) + "&action=answer", {
+        card_id: cardId,
+        rating,
+      }).then((payload) => {
+        cardsBusy = false;
+        if (cardsMode !== "study") return;
+        cardsRevealed = false;
+        cardsSessionDone = Math.min(cardsSessionTotal, cardsSessionDone + 1);
+        cardsPayload = payload;
+        cardsMode = "study";
+        rememberCardSettings(payload.settings);
+        renderCardStudy();
+      }).catch((err) => {
+        cardsBusy = false;
+        renderCardStudy();
+        const error = document.querySelector("#cards-study-error");
+        if (error) error.textContent = err.message;
+      });
+    }
+
+    async function openComposer(deckId) {
+      cardsMode = "compose";
+      cardsPayload = null;
+      clearCardWait();
+      stopCardClock();
+      const requestId = ++cardsRequest;
+      renderCardsLoading("Loading words…");
+      try {
+        let words;
+        let deckName = "";
+        if (deckId) {
+          const response = await apiFetch("/api/cards?id=" + encodeURIComponent(deckId) + "&action=words");
+          words = await response.json();
+          if (!response.ok) throw new Error(words.error || "Could not load words.");
+        } else {
+          const response = await apiFetch("/api/items");
+          const items = await response.json();
+          if (!response.ok) throw new Error(items.error || "Could not load words.");
+          words = (items || []).map((item) => ({
+            id: item.id,
+            spelling: item.spelling,
+            gloss: item.gloss,
+            in_deck: false,
+          }));
+        }
+        if (requestId !== cardsRequest) return;
+        cardsCompose = {
+          deckId,
+          deckName,
+          words,
+          selected: new Set(words.filter((word) => word.in_deck).map((word) => word.id)),
+        };
+        renderComposer();
+      } catch (err) {
+        if (requestId !== cardsRequest) return;
+        cardsError = err.message;
+        await loadCardDecks();
+      }
+    }
+
+    function renderComposer() {
+      const compose = cardsCompose;
+      const root = document.querySelector("#cards-root");
+      root.replaceChildren();
+      const home = node("div", "cards-home");
+      home.append(cardBackButton());
+      home.append(node("h2", null, compose.deckId ? "Add words" : "New deck"));
+      home.append(node(
+        "p",
+        "hint",
+        compose.deckId
+          ? "Tick a word to keep it in this deck."
+          : "Pick words you already saved. The deck stays with this language.",
+      ));
+      if (!compose.deckId) {
+        const field = node("div", "field");
+        const label = node("label", null, "Name");
+        label.htmlFor = "cards-deck-name";
+        const input = document.createElement("input");
+        input.id = "cards-deck-name";
+        input.type = "text";
+        input.autocomplete = "off";
+        input.placeholder = "Greetings";
+        field.append(label, input);
+        home.append(field);
+      }
+      const filterField = node("div", "field");
+      const filterLabel = node("label", null, "Find a word");
+      filterLabel.htmlFor = "cards-filter";
+      const filter = document.createElement("input");
+      filter.id = "cards-filter";
+      filter.type = "search";
+      filter.placeholder = "Search";
+      filter.autocomplete = "off";
+      filter.addEventListener("input", paintWordChoices);
+      filterField.append(filterLabel, filter);
+      home.append(filterField);
+      const list = node("div", "cards-words");
+      list.id = "cards-words";
+      home.append(list);
+      const error = node("p", "error");
+      error.id = "cards-compose-error";
+      const save = node("button", "primary", compose.deckId ? "Save words" : "Create deck");
+      save.type = "button";
+      save.onclick = () => saveComposer();
+      const actions = node("div", "cards-actions");
+      actions.append(save);
+      home.append(error, actions);
+      root.append(home);
+      paintWordChoices();
+      if (!compose.deckId) document.querySelector("#cards-deck-name").focus();
+    }
+
+    function paintWordChoices() {
+      const list = document.querySelector("#cards-words");
+      if (!list || !cardsCompose) return;
+      const query = (document.querySelector("#cards-filter").value || "").trim().toLowerCase();
+      list.replaceChildren();
+      const shown = cardsCompose.words.filter((word) => {
+        if (!query) return true;
+        return (word.spelling + " " + word.gloss).toLowerCase().includes(query);
+      });
+      if (!shown.length) {
+        list.append(node("p", "hint", cardsCompose.words.length ? "No words match." : "Save words on Today, then make a deck."));
+        return;
+      }
+      for (const word of shown) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "cards-word";
+        const on = cardsCompose.selected.has(word.id);
+        row.setAttribute("aria-pressed", on ? "true" : "false");
+        const mark = document.createElement("span");
+        mark.className = "cards-check";
+        mark.innerHTML = checklistCircle(on);
+        const copy = node("span", "cards-word-copy");
+        const spell = node("span", "cards-word-spell", word.spelling);
+        spell.dir = "auto";
+        copy.append(spell, node("span", "cards-word-gloss", word.gloss));
+        row.append(mark, copy);
+        row.onclick = () => {
+          if (cardsCompose.selected.has(word.id)) cardsCompose.selected.delete(word.id);
+          else cardsCompose.selected.add(word.id);
+          const next = cardsCompose.selected.has(word.id);
+          row.setAttribute("aria-pressed", next ? "true" : "false");
+          mark.innerHTML = checklistCircle(next);
+        };
+        list.append(row);
+      }
+    }
+
+    async function saveComposer() {
+      const compose = cardsCompose;
+      const error = document.querySelector("#cards-compose-error");
+      error.textContent = "";
+      const chosen = [...compose.selected];
+      try {
+        if (!compose.deckId) {
+          const name = document.querySelector("#cards-deck-name").value;
+          if (!name.trim()) throw new Error("Name the deck.");
+          if (!chosen.length) throw new Error("Choose at least one word.");
+          const payload = await post("/api/cards", { name, item_ids: chosen });
+          cardsMode = "study";
+          cardsRevealed = false;
+          cardsPayload = payload;
+          rememberCardSettings(payload.settings);
+          renderCardStudy();
+          return;
+        }
+        const had = new Set(compose.words.filter((word) => word.in_deck).map((word) => word.id));
+        const add = chosen.filter((id) => !had.has(id));
+        const remove = [...had].filter((id) => !compose.selected.has(id));
+        let payload = null;
+        if (add.length) {
+          payload = await post("/api/cards?id=" + encodeURIComponent(compose.deckId) + "&action=add", { item_ids: add });
+        }
+        if (remove.length) {
+          payload = await post("/api/cards?id=" + encodeURIComponent(compose.deckId) + "&action=remove", { item_ids: remove });
+        }
+        if (payload) {
+          cardsMode = "study";
+          cardsRevealed = false;
+          cardsPayload = payload;
+          rememberCardSettings(payload.settings);
+          renderCardStudy();
+          return;
+        }
+        await openCardStudy(compose.deckId);
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    }
+
+    async function openCardSettings() {
+      cardsMode = "settings";
+      cardsPayload = null;
+      clearCardWait();
+      stopCardClock();
+      const requestId = ++cardsRequest;
+      renderCardsLoading("Loading settings…");
+      try {
+        const response = await apiFetch("/api/cards?action=settings");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load settings.");
+        if (requestId !== cardsRequest) return;
+        rememberCardSettings(payload);
+        renderCardSettings();
+      } catch (err) {
+        if (requestId !== cardsRequest) return;
+        cardsError = err.message;
+        await loadCardDecks();
+      }
+    }
+
+    function renderCardSettings() {
+      const settings = cardsSettings;
+      const root = document.querySelector("#cards-root");
+      root.replaceChildren();
+      const home = node("div", "cards-home");
+      const head = node("div", "cards-home-header");
+      const title = node("div", "cards-home-title");
+      title.append(cardBackButton());
+      title.append(node("h2", null, "Settings"));
+      title.append(node("p", "hint", "Daily new cards, which face comes first, and the study timer."));
+      head.append(title);
+      home.append(head);
+
+      home.append(newCardsControl({
+        onSaved: () => {
+          if (cardsMode === "settings") renderCardSettings();
+        },
+        hint: "How many unseen cards to introduce each day, like Anki. Reviews are unlimited. 0 means reviews only.",
+      }));
+
+      const side = node("section", "cards-group");
+      side.append(node("h3", null, "Show first"));
+      side.append(node(
+        "p",
+        "hint",
+        settings.prompt_label + " is the word you saved. English is the meaning. Imported decks flip the same way.",
+      ));
+      const choices = node("div", "deck-list");
+      for (const choice of [
+        { id: "word", label: settings.prompt_label },
+        { id: "meaning", label: settings.answer_label },
+      ]) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "deck-row cards-choice";
+        row.disabled = cardsSettingsBusy;
+        const on = settings.side === choice.id;
+        row.setAttribute("aria-pressed", on ? "true" : "false");
+        row.append(node("span", "deck-name", choice.label));
+        if (on) {
+          const mark = document.createElement("span");
+          mark.className = "cards-check";
+          mark.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          row.append(mark);
+        }
+        row.onclick = () => {
+          if (choice.id !== settings.side) saveCardSettings({ side: choice.id });
+        };
+        choices.append(row);
+      }
+      side.append(choices);
+      home.append(side);
+
+      const preview = node("section", "cards-group");
+      preview.append(node("h3", null, "Preview"));
+      const sample = node("div", "cards-preview");
+      const prompt = node("p", "card-front", settings.preview_prompt || "—");
+      prompt.dir = "auto";
+      const answer = node("p", "card-back", settings.preview_answer || "");
+      answer.dir = "auto";
+      sample.append(prompt, answer);
+      preview.append(sample);
+      preview.append(node(
+        "p",
+        "hint",
+        settings.preview_example
+          ? "Example. Save a word and this will use it."
+          : "The large line is what you see before Show answer.",
+      ));
+      home.append(preview);
+
+      const timerGroup = node("section", "cards-group");
+      timerGroup.append(node("h3", null, "Timer"));
+      const row = node("div", "cards-setting");
+      const copy = node("div", "cards-setting-copy");
+      copy.append(node("p", "cards-setting-title", "Timer"));
+      copy.append(node("p", "hint", "Count the seconds on the card in front of you."));
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "cards-switch";
+      toggle.setAttribute("role", "switch");
+      toggle.setAttribute("aria-checked", settings.timer ? "true" : "false");
+      toggle.setAttribute("aria-label", "Timer");
+      toggle.disabled = cardsSettingsBusy;
+      toggle.append(document.createElement("span"));
+      toggle.onclick = () => saveCardSettings({ timer: !settings.timer });
+      row.append(copy, toggle);
+      timerGroup.append(row);
+      home.append(timerGroup);
+
+      const error = node("p", "error");
+      error.id = "cards-settings-error";
+      home.append(error);
+      root.append(home);
+    }
+
+    async function saveCardSettings(patch) {
+      if (cardsSettingsBusy) return;
+      const previous = cardsSettings;
+      cardsSettingsBusy = true;
+      cardsSettings = Object.assign({}, cardsSettings, patch);
+      if (cardsMode === "settings") renderCardSettings();
+      try {
+        const saved = await post("/api/cards?action=settings", patch);
+        cardsSettingsBusy = false;
+        cardsSettings = saved;
+        if (cardsMode === "settings") renderCardSettings();
+      } catch (err) {
+        cardsSettingsBusy = false;
+        cardsSettings = previous;
+        if (cardsMode === "settings") {
+          renderCardSettings();
+          const error = document.querySelector("#cards-settings-error");
+          if (error) error.textContent = err.message || "Could not save that.";
+        } else if (cardsMode === "home") {
+          cardsError = err.message || "Could not save that.";
+          await loadCardDecks();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (document.querySelector("#pane-cards").hidden) return;
+      if (event.key === "Escape" && cardsMode !== "home") {
+        event.preventDefault();
+        loadCardDecks();
+        return;
+      }
+      if (event.target.closest("input, textarea")) return;
+      if (cardsMode !== "study" || cardsBusy || !cardsPayload) return;
+      if (event.key === " ") {
+        event.preventDefault();
+        if (!cardsRevealed && cardsPayload.card) {
+          cardsRevealed = true;
+          renderCardStudy();
+        } else if (cardsRevealed) {
+          answerCurrent(3);
+        }
+        return;
+      }
+      const rating = { "1": 1, "3": 3 }[event.key];
+      if (rating && cardsRevealed) {
+        event.preventDefault();
+        answerCurrent(rating);
+      }
     });
 
     function localeTag() {
@@ -2476,7 +3959,16 @@
       sendTalk(line);
     });
 
-    localStorage.removeItem("appearance");
+    document.querySelector("#theme-toggle").onclick = () => {
+      applyAppearance(resolvedTheme() === "dark" ? "light" : "dark");
+    };
+    document.querySelectorAll("[data-appearance]").forEach((button) => {
+      button.onclick = () => applyAppearance(button.dataset.appearance);
+    });
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (getAppearance() === "system") applyAppearance("system");
+    });
+    applyAppearance(getAppearance());
 
     applyLanguage(learningLanguage);
     runMotion();

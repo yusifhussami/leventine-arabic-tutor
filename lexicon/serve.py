@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
+from lexicon.cards import dispatch_get, dispatch_post, import_apkg
 from lexicon.db import LOCAL_USER, open_db
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
@@ -83,6 +84,24 @@ class NotebookHandler(BaseHTTPRequestHandler):
             finally:
                 conn.close()
             return
+        if path == "/api/cards":
+            query = parse_qs(urlparse(self.path).query)
+            conn = _db()
+            try:
+                self._json(
+                    200,
+                    dispatch_get(
+                        conn,
+                        LOCAL_USER,
+                        query.get("id", [""])[0],
+                        query.get("action", [""])[0],
+                    ),
+                )
+            except (ValueError, LookupError) as exc:
+                self._json(400, {"error": str(exc)})
+            finally:
+                conn.close()
+            return
         if path.startswith("/api/items/") and path.endswith("/similar"):
             item_id = path.removeprefix("/api/items/").removesuffix("/similar").strip("/")
             conn = _db()
@@ -97,6 +116,9 @@ class NotebookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/cards" and parse_qs(urlparse(self.path).query).get("action", [""])[0] == "import":
+            self._import_cards()
+            return
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
         except json.JSONDecodeError:
@@ -202,6 +224,21 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 )
                 self._bytes(200, audio, "audio/wav")
                 return
+            if path == "/api/cards":
+                query = parse_qs(urlparse(self.path).query)
+                conn = _db()
+                try:
+                    saved = dispatch_post(
+                        conn,
+                        LOCAL_USER,
+                        query.get("id", [""])[0],
+                        query.get("action", [""])[0],
+                        body,
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
+                return
             if path == "/api/practice":
                 conn = _db()
                 try:
@@ -259,6 +296,28 @@ class NotebookHandler(BaseHTTPRequestHandler):
         finally:
             conn.close()
         self._json(200, updated)
+
+    def _import_cards(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0:
+            self._json(400, {"error": "choose an Anki deck"})
+            return
+        if length > 32 * 1024 * 1024:
+            self._json(400, {"error": "that deck is too large"})
+            return
+        raw = self.rfile.read(length)
+        conn = _db()
+        try:
+            saved = import_apkg(conn, raw, user_id=LOCAL_USER)
+        except ValueError as exc:
+            self._json(400, {"error": str(exc)})
+            return
+        finally:
+            conn.close()
+        self._json(200, saved)
 
     def log_message(self, fmt: str, *args) -> None:
         return

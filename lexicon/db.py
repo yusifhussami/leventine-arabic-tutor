@@ -59,6 +59,36 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+
+CREATE TABLE IF NOT EXISTS card_decks (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('words', 'anki')),
+    language TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    weights TEXT NOT NULL DEFAULT '',
+    retention DOUBLE PRECISION NOT NULL DEFAULT 0.9,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS study_cards (
+    id BIGSERIAL PRIMARY KEY,
+    deck_id BIGINT NOT NULL REFERENCES card_decks (id) ON DELETE CASCADE,
+    item_id BIGINT,
+    front TEXT NOT NULL,
+    back TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'new',
+    stability DOUBLE PRECISION,
+    difficulty DOUBLE PRECISION,
+    due_at TEXT NOT NULL,
+    scheduled_days INTEGER NOT NULL DEFAULT 0,
+    learning_remaining INTEGER NOT NULL DEFAULT 0,
+    reps INTEGER NOT NULL DEFAULT 0,
+    lapses INTEGER NOT NULL DEFAULT 0,
+    last_review_at TEXT,
+    introduced_on TEXT,
+    suspended INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -147,6 +177,13 @@ def open_postgres(url: str) -> PgConnection:
         wrapped.execute(
             "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
             "ON lessons (user_id, language, learned_on DESC, id DESC)"
+        )
+        wrapped.execute(
+            "CREATE INDEX IF NOT EXISTS idx_card_decks_user ON card_decks (user_id, source)"
+        )
+        wrapped.execute(
+            "CREATE INDEX IF NOT EXISTS idx_study_cards_due "
+            "ON study_cards (deck_id, suspended, due_at)"
         )
         wrapped.commit()
     except Exception:

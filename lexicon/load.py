@@ -157,6 +157,42 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+
+-- Flashcard decks. source 'words' is built from the notebook.
+-- source 'anki' is an imported package and is not tied to a learning language.
+CREATE TABLE IF NOT EXISTS card_decks (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('words', 'anki')),
+    language TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    weights TEXT NOT NULL DEFAULT '',
+    retention REAL NOT NULL DEFAULT 0.9,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_card_decks_user ON card_decks (user_id, source);
+
+CREATE TABLE IF NOT EXISTS study_cards (
+    id INTEGER PRIMARY KEY,
+    deck_id INTEGER NOT NULL REFERENCES card_decks (id) ON DELETE CASCADE,
+    item_id INTEGER,
+    front TEXT NOT NULL,
+    back TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'new',
+    stability REAL,
+    difficulty REAL,
+    due_at TEXT NOT NULL,
+    scheduled_days INTEGER NOT NULL DEFAULT 0,
+    learning_remaining INTEGER NOT NULL DEFAULT 0,
+    reps INTEGER NOT NULL DEFAULT 0,
+    lapses INTEGER NOT NULL DEFAULT 0,
+    last_review_at TEXT,
+    introduced_on TEXT,
+    suspended INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards (deck_id, suspended, due_at);
 """
 
 

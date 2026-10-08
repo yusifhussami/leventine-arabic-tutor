@@ -168,6 +168,7 @@ def save_lesson(
                     "kind": item_kind(spelling),
                 }
             )
+    _refresh_words_deck(conn, user_id)
     return {"id": lesson_id, "learned_on": learned_on, "items": items, "skipped": skipped}
 
 
@@ -260,6 +261,7 @@ def import_csv(
     added = 0
     for day, triples in by_day.items():
         added += _store_imported_day(conn, day, triples, embed, user_id, learning)
+    _refresh_words_deck(conn, user_id)
     return {"days": len(by_day), "items": added}
 
 
@@ -290,7 +292,16 @@ def _commit_imported_days(conn, by_day, embed, user_id: str, language: str) -> d
             continue
         days += 1
         added += _store_imported_day(conn, day, triples, embed, user_id, learning)
+    if added:
+        _refresh_words_deck(conn, user_id)
     return {"days": days, "items": added}
+
+
+def _refresh_words_deck(conn, user_id: str) -> None:
+    """Keep the Cards Words deck in step with the notebook."""
+    from lexicon.cards import sync_words_for_user
+
+    sync_words_for_user(conn, user_id)
 
 
 def _store_imported_day(
