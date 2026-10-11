@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 from lexicon.load import connect as connect_sqlite
 
 LOCAL_USER = "local"
+_POSTGRES_SCHEMA_LOCK = threading.Lock()
+_POSTGRES_SCHEMA_READY = False
 
 PG_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lessons (
@@ -153,6 +156,8 @@ def open_db(db_path: Path | str = "lexicon.db", *, sqlite_only: bool = False):
 
 
 def open_postgres(url: str) -> PgConnection:
+    global _POSTGRES_SCHEMA_READY
+
     import psycopg
     from psycopg.rows import dict_row
 
@@ -164,34 +169,38 @@ def open_postgres(url: str) -> PgConnection:
         prepare_threshold=None,
     )
     wrapped = PgConnection(conn)
-    try:
-        for statement in PG_SCHEMA.split(";"):
-            text = statement.strip()
-            if text:
-                wrapped.execute(text)
-        # Existing hosted DBs were created before language existed.
-        wrapped.execute(
-            "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'arabic'"
-        )
-        wrapped.execute(
-            "CREATE INDEX IF NOT EXISTS idx_lessons_user "
-            "ON lessons (user_id, learned_on DESC, id DESC)"
-        )
-        wrapped.execute(
-            "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
-            "ON lessons (user_id, language, learned_on DESC, id DESC)"
-        )
-        wrapped.execute(
-            "CREATE INDEX IF NOT EXISTS idx_card_decks_user ON card_decks (user_id, source)"
-        )
-        wrapped.execute(
-            "CREATE INDEX IF NOT EXISTS idx_study_cards_due "
-            "ON study_cards (deck_id, suspended, due_at)"
-        )
-        wrapped.commit()
-    except Exception:
-        wrapped.close()
-        raise
+    if not _POSTGRES_SCHEMA_READY:
+        with _POSTGRES_SCHEMA_LOCK:
+            if not _POSTGRES_SCHEMA_READY:
+                try:
+                    for statement in PG_SCHEMA.split(";"):
+                        text = statement.strip()
+                        if text:
+                            wrapped.execute(text)
+                    # Existing hosted DBs were created before language existed.
+                    wrapped.execute(
+                        "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'arabic'"
+                    )
+                    wrapped.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_lessons_user "
+                        "ON lessons (user_id, learned_on DESC, id DESC)"
+                    )
+                    wrapped.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
+                        "ON lessons (user_id, language, learned_on DESC, id DESC)"
+                    )
+                    wrapped.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_card_decks_user ON card_decks (user_id, source)"
+                    )
+                    wrapped.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_study_cards_due "
+                        "ON study_cards (deck_id, suspended, due_at)"
+                    )
+                    wrapped.commit()
+                    _POSTGRES_SCHEMA_READY = True
+                except Exception:
+                    wrapped.close()
+                    raise
     return wrapped
 
 

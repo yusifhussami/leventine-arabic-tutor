@@ -239,10 +239,17 @@ def save_card_settings(conn, user_id: str, body: dict) -> dict:
     return card_settings(conn, user_id)
 
 
-def study(conn, user_id: str, deck_id: int, now: datetime | None = None) -> dict:
+def study(
+    conn,
+    user_id: str,
+    deck_id: int,
+    now: datetime | None = None,
+    *,
+    sync_words: bool = True,
+) -> dict:
     now = _now(now)
     deck = _owned_deck(conn, user_id, deck_id)
-    if deck["source"] == "words":
+    if deck["source"] == "words" and sync_words:
         _sync_words_deck(conn, deck, now)
         deck = _owned_deck(conn, user_id, deck_id)
     queue, waiting = _queue(conn, deck, now)
@@ -319,7 +326,7 @@ def answer(conn, user_id: str, deck_id: int, card_id: int, rating: int, now: dat
                 deck_id,
             ),
         )
-    return study(conn, user_id, deck_id, now)
+    return study(conn, user_id, deck_id, now, sync_words=False)
 
 
 def import_apkg(conn, blob: bytes, user_id: str, now: datetime | None = None) -> dict:

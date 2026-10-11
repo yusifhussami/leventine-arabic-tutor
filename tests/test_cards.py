@@ -6,6 +6,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from lexicon.cards import (
     answer,
@@ -256,6 +257,15 @@ class CardDeckTests(unittest.TestCase):
         self.assertIn("marhaba", fronts)
         synced = sync_words_for_user(self.conn, "local", now=NOW)
         self.assertEqual(synced["id"], deck_id)
+
+    def test_answer_does_not_rescan_all_notebook_words(self) -> None:
+        deck_id = list_decks(self.conn, "local", now=NOW)["words"][0]["id"]
+        session = study(self.conn, "local", deck_id, now=NOW)
+
+        with patch("lexicon.cards._sync_words_deck") as sync:
+            answer(self.conn, "local", deck_id, session["card"]["id"], 3, now=NOW)
+
+        sync.assert_not_called()
 
     def test_anki_import_stays_out_of_the_notebook(self) -> None:
         before = len(list_items(self.conn))
