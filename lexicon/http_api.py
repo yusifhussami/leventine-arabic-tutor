@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -116,3 +117,6 @@ def handle_errors(handler, run) -> None:
         json_response(handler, 400, {"error": str(exc)})
     except RuntimeError as exc:
         json_response(handler, 502, {"error": str(exc)})
+    except Exception:
+        traceback.print_exc()
+        json_response(handler, 500, {"error": "Server error. Try again."})

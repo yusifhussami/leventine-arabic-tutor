@@ -113,11 +113,14 @@ class PgConnection:
         self._conn.close()
 
     def __enter__(self):
-        self._conn.__enter__()
         return self
 
-    def __exit__(self, *args):
-        return self._conn.__exit__(*args)
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+        return False
 
 
 def _pg_sql(sql: str) -> str:

@@ -3102,8 +3102,17 @@
         }
         return response;
       }
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "request failed");
+      const text = await response.text();
+      let payload = {};
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch (err) {
+        if (!response.ok) {
+          throw new Error(response.status >= 500 ? "Server error. Try again." : (text.trim() || "Request failed."));
+        }
+        throw new Error("The server returned an invalid response.");
+      }
+      if (!response.ok) throw new Error(payload.error || "Request failed.");
       return payload;
     }
 
