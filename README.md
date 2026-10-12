@@ -39,6 +39,10 @@ python3 -m pip install -r requirements.txt
 
 To point local serve at the same Supabase database, put `DATABASE_URL` in `.env`. Without it, local serve keeps using `lexicon.db`.
 
+## iPhone app
+
+The installable app is in [`mobile/`](mobile/README.md). It talks to this same API. TestFlight is the install path; Expo Go is the quick way to try a build. See that readme for the steps.
+
 ## On a phone (local network)
 
 `127.0.0.1` only works on the computer running the notebook. On the same Wi‑Fi:
