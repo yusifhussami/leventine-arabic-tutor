@@ -100,6 +100,98 @@ class IntakeTests(unittest.TestCase):
             ],
         )
 
+    def test_dash_lines_match_equals_lines(self) -> None:
+        rows = [
+            ("eb7as", "to search"),
+            ("ahwe", "coffee"),
+            ("b shakel 3aam", "generally"),
+            ("3am y-9eer", "changing"),
+            ("b-y-a7ko", "they talk"),
+            ("y-eshra7-lak", "he'll explain to you"),
+            ("keefak", "how are you (casual)"),
+            ("amma", "as for / but"),
+            ("6awaret", "i developed (something else)"),
+            ("mish", "not"),
+            ("shu", "what"),
+        ]
+        equals = "\n".join(f"{word} = {gloss}" for word, gloss in rows)
+        dashed = "\n".join(f"{word} - {gloss}" for word, gloss in rows)
+        self.assertEqual(parse_lesson_text(equals), rows)
+        self.assertEqual(parse_lesson_text(dashed), rows)
+        self.assertEqual(parse_lesson_text(dashed), parse_lesson_text(equals))
+
+    def test_dash_spacing_and_wide_dashes(self) -> None:
+        expected = [("ahwe", "coffee")]
+        for line in (
+            "ahwe - coffee",
+            "ahwe- coffee",
+            "ahwe -coffee",
+            "ahwe-coffee",
+            "ahwe – coffee",
+            "ahwe — coffee",
+            "ahwe–coffee",
+            "ahwe—coffee",
+            "ahwe − coffee",
+            "ahwe‐coffee",
+            "ahwe‑coffee",
+            "  ahwe   -   coffee  ",
+        ):
+            self.assertEqual(parse_lesson_text(line), expected, line)
+
+    def test_hyphen_inside_arabizi_stays_on_the_word(self) -> None:
+        self.assertEqual(
+            parse_lesson_text(
+                "3am y-9eer - changing\n"
+                "3am y-9eer-to change\n"
+                "b-y-a7ko - they talk\n"
+                "b-y-a7ko-they talk\n"
+                "y-eshra7-lak - he'll explain to you\n"
+                "y-eshra7-lak-he'll explain to you\n"
+                "y-eshra7-lak = to explain (to you)\n"
+                "b-y-a7ko = they talk / speak\n"
+            ),
+            [
+                ("3am y-9eer", "changing"),
+                ("3am y-9eer", "to change"),
+                ("b-y-a7ko", "they talk"),
+                ("b-y-a7ko", "they talk"),
+                ("y-eshra7-lak", "he'll explain to you"),
+                ("y-eshra7-lak", "he'll explain to you"),
+                ("y-eshra7-lak", "to explain (to you)"),
+                ("b-y-a7ko", "they talk / speak"),
+            ],
+        )
+
+    def test_slash_parentheses_and_a_dash_inside_the_meaning(self) -> None:
+        self.assertEqual(
+            parse_lesson_text(
+                "eb7as - to search / look for\n"
+                "ahwe - coffee (the drink)\n"
+                "ahwe - well-known\n"
+                "eb7as - to search - online\n"
+                "ahwe - coffee - the drink\n"
+                "b shakel 3aam — generally / in general\n"
+            ),
+            [
+                ("eb7as", "to search / look for"),
+                ("ahwe", "coffee (the drink)"),
+                ("ahwe", "well-known"),
+                ("eb7as", "to search - online"),
+                ("ahwe", "coffee - the drink"),
+                ("b shakel 3aam", "generally / in general"),
+            ],
+        )
+
+    def test_japanese_dash_still_puts_one_spelling_on_the_right(self) -> None:
+        self.assertEqual(
+            parse_lesson_text("hello - konnichiwa", language="japanese"),
+            [("konnichiwa", "hello")],
+        )
+        self.assertEqual(
+            parse_lesson_text("thank you - ありがとう\nwater = みず", language="japanese"),
+            [("ありがとう", "thank you"), ("water", "みず")],
+        )
+
 
 class NotebookTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -109,6 +201,41 @@ class NotebookTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.conn.close()
         self.tmp.cleanup()
+
+    def test_dash_lesson_is_stored_with_arabizi_as_the_word(self) -> None:
+        text = (
+            "eb7as - to search\n"
+            "ahwe - coffee\n"
+            "b shakel 3aam - generally\n"
+            "3am y-9eer - changing\n"
+            "b-y-a7ko - they talk / speak\n"
+            "y-eshra7-lak - he'll explain to you (later)\n"
+            "ahwe–espresso\n"
+            "bas = but\n"
+        )
+        saved = save_lesson(
+            self.conn,
+            "2026-10-06",
+            text,
+            embed=lambda glosses: [[0.0, 1.0] for _ in glosses],
+        )
+        stored = [(item["spelling"], item["gloss"], item["kind"]) for item in saved["items"]]
+        expected = [
+            ("eb7as", "to search", "word"),
+            ("ahwe", "coffee", "word"),
+            ("b shakel 3aam", "generally", "phrase"),
+            ("3am y-9eer", "changing", "phrase"),
+            ("b-y-a7ko", "they talk / speak", "word"),
+            ("y-eshra7-lak", "he'll explain to you (later)", "word"),
+            ("ahwe", "espresso", "word"),
+            ("bas", "but", "word"),
+        ]
+        self.assertEqual(stored, expected)
+        self.assertEqual(saved["skipped"], [])
+        listed = [
+            (item["spelling"], item["gloss"], item["kind"]) for item in list_items(self.conn)
+        ]
+        self.assertEqual(listed, expected)
 
     def test_arabic_and_japanese_words_stay_on_separate_notebooks(self) -> None:
         save_lesson(
