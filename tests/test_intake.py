@@ -237,6 +237,41 @@ class NotebookTests(unittest.TestCase):
         ]
         self.assertEqual(listed, expected)
 
+    def test_owner_production_paste_saves_arabizi_then_english(self) -> None:
+        # Screenshot from production: space before the dash and none after,
+        # capitalised meanings, and an apostrophe in the Arabizi.
+        text = (
+            "tanfosi - competitive\n"
+            "3are9' -Offer\n"
+            "efre2 - to Divide\n"
+            "fare2 - difference\n"
+            "ta56i6 -Planning\n"
+            "3a9eb -To get angry\n"
+            "2e9a9 -Stories"
+        )
+        expected = [
+            ("tanfosi", "competitive"),
+            ("3are9'", "Offer"),
+            ("efre2", "to Divide"),
+            ("fare2", "difference"),
+            ("ta56i6", "Planning"),
+            ("3a9eb", "To get angry"),
+            ("2e9a9", "Stories"),
+        ]
+        self.assertEqual(parse_lesson_text(text), expected)
+        self.assertEqual(parse_lesson_text("2e9a9 -Stories"), [("2e9a9", "Stories")])
+        saved = save_lesson(
+            self.conn,
+            "2026-10-20",
+            text,
+            embed=lambda glosses: [[0.0, 1.0] for _ in glosses],
+        )
+        stored = [(item["spelling"], item["gloss"]) for item in saved["items"]]
+        self.assertEqual(stored, expected)
+        self.assertEqual(saved["skipped"], [])
+        listed = [(item["spelling"], item["gloss"]) for item in list_items(self.conn)]
+        self.assertEqual(listed, expected)
+
     def test_arabic_and_japanese_words_stay_on_separate_notebooks(self) -> None:
         save_lesson(
             self.conn,
