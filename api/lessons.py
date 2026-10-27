@@ -19,19 +19,22 @@ class handler(BaseHTTPRequestHandler):
             user_id = require_user(self)
             body = read_json(self)
             if query_param(self, "preview") == "1" or body.get("preview"):
-                pairs = parse_lesson_text(body.get("text") or "")
-                json_response(
-                    self,
-                    200,
-                    [
+
+                def preview(conn):
+                    # Same language save_lesson uses, so the preview rows match
+                    # the words that land in the list.
+                    language = get_language(conn, user_id)
+                    pairs = parse_lesson_text(body.get("text") or "", language=language)
+                    return [
                         {
                             "spelling": spelling,
                             "gloss": gloss,
                             "kind": item_kind(spelling),
                         }
                         for spelling, gloss in pairs
-                    ],
-                )
+                    ]
+
+                json_response(self, 200, with_db(preview))
                 return
 
             def work(conn):

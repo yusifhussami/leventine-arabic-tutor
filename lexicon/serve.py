@@ -142,7 +142,12 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._json(200, {"language": language})
                 return
             if path == "/api/preview":
-                pairs = parse_lesson_text(body.get("text") or "")
+                conn = _db()
+                try:
+                    language = get_language(conn, LOCAL_USER)
+                finally:
+                    conn.close()
+                pairs = parse_lesson_text(body.get("text") or "", language=language)
                 self._json(
                     200,
                     [

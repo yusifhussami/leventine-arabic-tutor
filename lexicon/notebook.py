@@ -110,7 +110,10 @@ def save_lesson(
     Words are stored under the account's current learning language.
     """
     learning = _learning(conn, user_id, language)
-    parsed = [(spelling, gloss) for spelling, gloss in parse_lesson_text(raw_text)]
+    parsed = [
+        (spelling, gloss)
+        for spelling, gloss in parse_lesson_text(raw_text, language=learning)
+    ]
     known = _known_pairs(conn, user_id, learning)
     pairs = []
     skipped = []
