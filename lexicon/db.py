@@ -92,6 +92,17 @@ CREATE TABLE IF NOT EXISTS study_cards (
     introduced_on TEXT,
     suspended INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS lesson_topics (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'arabic',
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('suggested', 'done', 'skipped')),
+    target_words TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -195,6 +206,10 @@ def open_postgres(url: str) -> PgConnection:
                     wrapped.execute(
                         "CREATE INDEX IF NOT EXISTS idx_study_cards_due "
                         "ON study_cards (deck_id, suspended, due_at)"
+                    )
+                    wrapped.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_lesson_topics_user_lang "
+                        "ON lesson_topics (user_id, language, created_at DESC, id ASC)"
                     )
                     wrapped.commit()
                     _POSTGRES_SCHEMA_READY = True

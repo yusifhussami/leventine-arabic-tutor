@@ -26,6 +26,7 @@ from lexicon.notebook import (
 )
 from lexicon.prefs import get_language, normalize_language, save_language
 from lexicon.speak import speak_text, speech_stream_payload
+from lexicon.topics import generate_topics, list_topics, set_topic_status
 
 PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
 if not PAGE.exists():
@@ -66,6 +67,30 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     self._json(502, {"error": "could not read the calendar"})
                     return
                 self._json(200, {"connected": True, "lesson": lesson})
+            finally:
+                conn.close()
+            return
+        if path == "/api/topics":
+            query = parse_qs(urlparse(self.path).query)
+            conn = _db()
+            try:
+                language = normalize_language(
+                    query.get("language", [""])[0] or get_language(conn, LOCAL_USER)
+                )
+                self._json(
+                    200,
+                    {
+                        "language": language,
+                        "topics": list_topics(
+                            conn,
+                            user_id=LOCAL_USER,
+                            language=language,
+                            status=query.get("status", [""])[0],
+                        ),
+                    },
+                )
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
             finally:
                 conn.close()
             return
@@ -239,6 +264,22 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     conn.close()
                 self._json(200, saved)
                 return
+            if path == "/api/topics":
+                conn = _db()
+                try:
+                    language = normalize_language(
+                        body.get("language") or get_language(conn, LOCAL_USER)
+                    )
+                    saved = generate_topics(
+                        conn,
+                        read_api_key(),
+                        user_id=LOCAL_USER,
+                        language=language,
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
+                return
             if path == "/api/practice":
                 conn = _db()
                 try:
@@ -267,6 +308,9 @@ class NotebookHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/topics":
+            self._update_topic()
+            return
         prefix = "/api/items/"
         if not path.startswith(prefix) or path.endswith("/similar"):
             self._json(404, {"error": "not found"})
@@ -289,6 +333,37 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 body.get("spelling") or "",
                 body.get("gloss") or "",
                 user_id=LOCAL_USER,
+            )
+        except (ValueError, LookupError) as exc:
+            self._json(400, {"error": str(exc)})
+            return
+        finally:
+            conn.close()
+        self._json(200, updated)
+
+    def _update_topic(self) -> None:
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+        except json.JSONDecodeError:
+            self._json(400, {"error": "send JSON"})
+            return
+        query = parse_qs(urlparse(self.path).query)
+        try:
+            topic_id = int(query.get("id", [""])[0])
+        except ValueError:
+            self._json(400, {"error": "need a topic id"})
+            return
+        conn = _db()
+        try:
+            language = normalize_language(
+                body.get("language") or get_language(conn, LOCAL_USER)
+            )
+            updated = set_topic_status(
+                conn,
+                topic_id,
+                body.get("status") or "",
+                user_id=LOCAL_USER,
+                language=language,
             )
         except (ValueError, LookupError) as exc:
             self._json(400, {"error": str(exc)})

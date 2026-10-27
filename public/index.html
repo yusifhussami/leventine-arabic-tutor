@@ -702,6 +702,119 @@
       font-size: 13px;
     }
     .checklist-empty:empty { display: none; }
+    #pane-topics { background: var(--grouped); }
+    .topics-shell { max-width: 680px; margin: 0 auto; }
+    .topics-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .topics-head h2 { margin: 0 0 4px; }
+    .topics-head .hint { max-width: 440px; margin: 0; line-height: 1.45; }
+    #topics-generate { flex-shrink: 0; min-height: 32px; }
+    #topics-generate:disabled { opacity: 0.5; }
+    .topics-filters {
+      display: flex;
+      gap: 6px;
+      margin: 14px 0;
+    }
+    .topics-filters button {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--secondary);
+      min-height: 28px;
+      padding: 0 12px;
+    }
+    .topics-filters button[aria-pressed="true"] {
+      background: var(--window);
+      color: var(--label);
+      box-shadow: 0 0 0 1px var(--separator);
+    }
+    .topic-card {
+      background: var(--window);
+      border: 1px solid color-mix(in srgb, var(--separator) 70%, transparent);
+      border-radius: 12px;
+      padding: 16px 16px 14px;
+      margin: 0 0 12px;
+    }
+    .topic-card.is-fresh { box-shadow: 0 0 0 1px var(--blue); }
+    .topic-kicker {
+      margin: 0 0 4px;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--blue-text);
+    }
+    .topic-card h3 {
+      margin: 0 0 6px;
+      font-family: var(--reading);
+      font-size: 22px;
+      font-weight: 560;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .topic-why {
+      margin: 0 0 12px;
+      color: var(--secondary);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .topic-label {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--tertiary);
+    }
+    .topic-words {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+    }
+    .topic-words li {
+      background: var(--grouped);
+      border-radius: 8px;
+      padding: 6px 8px;
+      max-width: 100%;
+    }
+    .topic-words .spelling {
+      display: block;
+      font-family: var(--reading);
+      font-size: 15px;
+    }
+    .topic-words .gloss {
+      display: block;
+      color: var(--secondary);
+      font-size: 11px;
+    }
+    .topic-prompts {
+      margin: 0 0 12px;
+      padding-left: 18px;
+    }
+    .topic-prompts li {
+      margin: 4px 0;
+      font-family: var(--reading);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    .topic-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .topic-empty {
+      margin: 8px 2px 0;
+      color: var(--secondary);
+      font-size: 13px;
+    }
+    @media (max-width: 720px) {
+      .topics-head { flex-direction: column; align-items: stretch; }
+      #topics-generate { align-self: flex-start; }
+    }
     #pane-cards:not([hidden]) {
       display: flex;
       flex-direction: column;
@@ -1268,6 +1381,10 @@
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 18.5V6.8A2.8 2.8 0 0 1 8.8 4h8.7a.5.5 0 0 1 .5.5V17" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M9 8.5h6M9 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           <span data-i18n="tabPractice">Practice</span>
         </button>
+        <button class="tab" type="button" data-tab="topics">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.2 16.6 5.6 19a.7.7 0 0 0 .9.9l2.2-1.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 16.8h7.4A3.6 3.6 0 0 0 19 13.2V8.2A3.2 3.2 0 0 0 15.8 5H8.2A3.2 3.2 0 0 0 5 8.2v5.2c0 1.9 1.3 3.4 3 3.4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span data-i18n="tabTopics">Topics</span>
+        </button>
         <button class="tab" type="button" data-tab="words">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h6.2A2.8 2.8 0 0 1 14 8.3V19a2.2 2.2 0 0 0-2.2-2.2H5V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 5.5h-6.2A2.8 2.8 0 0 0 10 8.3V19a2.2 2.2 0 0 1 2.2-2.2H19V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
           <span data-i18n="tabWords">Words</span>
@@ -1400,6 +1517,26 @@
           </section>
         </div>
 
+        <div id="pane-topics" class="pane" hidden>
+          <div class="topics-shell">
+            <div class="topics-head">
+              <div>
+                <h2 data-i18n="tabTopics">Topics</h2>
+                <p class="hint" data-i18n="topicsHint">A situation you and Amer can talk about next lesson, using words you already saved.</p>
+              </div>
+              <button id="topics-generate" class="primary" type="button" data-i18n="topicsGenerate">Generate a topic</button>
+            </div>
+            <p id="topics-error" class="error"></p>
+            <div class="topics-filters" role="group" aria-label="Topic history">
+              <button type="button" data-topics-filter="suggested" aria-pressed="true" data-i18n="topicsSuggested">Suggested</button>
+              <button type="button" data-topics-filter="done" aria-pressed="false" data-i18n="topicsDone">Done</button>
+              <button type="button" data-topics-filter="skipped" aria-pressed="false" data-i18n="topicsSkipped">Skipped</button>
+            </div>
+            <div id="topics-list"></div>
+            <p id="topics-empty" class="topic-empty" hidden></p>
+          </div>
+        </div>
+
         <div id="pane-words" class="pane" hidden>
           <p id="word-count" class="count"></p>
           <p id="library-error" class="error"></p>
@@ -1476,6 +1613,12 @@
     let pendingCsvText = "";
     let libraryRequest = 0;
     let searchTimer = null;
+    let topicsCache = [];
+    let topicsFilter = "suggested";
+    let topicsFresh = new Set();
+    let topicsLoadedFor = "";
+    let topicsRequest = 0;
+    let topicsBusy = false;
 
     function normalizeLearningLanguage(value) {
       const raw = (value || "").toLowerCase();
@@ -1491,6 +1634,7 @@
     const UI = {
       tabToday: "Today",
       tabPractice: "Practice",
+      tabTopics: "Topics",
       tabWords: "Words",
       tabCards: "Cards",
       tabChecklist: "Checklist",
@@ -1575,6 +1719,22 @@
       startScene: "Start. You speak first, in the place, one short line.",
       languageHint:
         "The app stays in English. Pick the language you practice: speaking, listening, and spellings follow that choice.",
+      topicsGenerate: "Generate a topic",
+      topicsAnother: "Another topic",
+      topicsThinking: "Thinking…",
+      topicsSuggested: "Suggested",
+      topicsDone: "Done",
+      topicsSkipped: "Skipped",
+      topicsMarkDone: "Mark done",
+      topicsSkip: "Skip",
+      topicsUndo: "Undo",
+      topicsWords: "Words to use",
+      topicsPrompts: "Starter lines",
+      topicsEmptySuggested: "No topics yet. Generate one from words you already saved.",
+      topicsEmptyDone: "Nothing marked done yet.",
+      topicsEmptySkipped: "Nothing skipped.",
+      topicsNext: "For the next lesson",
+      topicsAlso: "Also possible",
     };
 
     const MODE = {
@@ -1589,6 +1749,7 @@
         arabiziAria: "Arabizi",
         speakMissing: "No Arabic script to speak. Type a line, or try again.",
         micLang: "ar-SA",
+        topicsHint: "A situation you and Amer can talk about next lesson, using words you already saved.",
       },
       japanese: {
         lessonHint: "Each kana (or romaji) spelling stays with its English meaning.",
@@ -1603,6 +1764,7 @@
         micLang: "ja-JP",
         importHint:
           "Japanese sheet: Kanji, Kana (hiragana/katakana), and Meaning/English. Practice uses kana; kanji stays on the meaning line.",
+        topicsHint: "A situation for your next lesson, using words you already saved.",
       },
     };
 
@@ -1745,6 +1907,7 @@
       const titleKeys = {
         today: "tabToday",
         practice: "tabPractice",
+        topics: "tabTopics",
         words: "tabWords",
         cards: "tabCards",
         checklist: "tabChecklist",
@@ -1767,6 +1930,11 @@
         loadLibrary().catch(() => {});
         loadRecent().catch(() => {});
         renderChecklist();
+        topicsCache = [];
+        topicsFresh = new Set();
+        topicsLoadedFor = "";
+        renderTopics();
+        if (!document.querySelector("#pane-topics").hidden) loadTopics();
         cardsMode = "home";
         if (!document.querySelector("#pane-cards").hidden) loadCardDecks();
       }
@@ -1912,6 +2080,7 @@
       const titleKeys = {
         today: "tabToday",
         practice: "tabPractice",
+        topics: "tabTopics",
         words: "tabWords",
         cards: "tabCards",
         checklist: "tabChecklist",
@@ -1923,7 +2092,7 @@
         clearCardWait();
         stopCardClock();
       }
-      for (const tab of ["today", "practice", "words", "cards", "checklist", "settings"]) {
+      for (const tab of ["today", "practice", "topics", "words", "cards", "checklist", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -1932,7 +2101,149 @@
         else button.removeAttribute("aria-current");
       }
       if (name === "checklist") renderChecklist();
+      if (name === "topics" && topicsLoadedFor !== learningLanguage) loadTopics();
       if (name === "cards" && cardsMode === "home") loadCardDecks();
+    }
+
+    function topicWords(topic) {
+      return Array.isArray(topic.target_words) ? topic.target_words : [];
+    }
+
+    function renderTopicCard(topic) {
+      const card = node("article", "topic-card");
+      if (topicsFresh.has(topic.id)) card.classList.add("is-fresh");
+      const newestPrimary = topicsCache.find(
+        (item) => item.status === "suggested" && item.role === "primary",
+      );
+      let kicker = "";
+      if (topic.status === "suggested" && newestPrimary && topic.id === newestPrimary.id) {
+        kicker = t("topicsNext");
+      } else if (topic.status === "suggested" && topic.role === "alternate") {
+        kicker = t("topicsAlso");
+      }
+      if (kicker) card.append(node("p", "topic-kicker", kicker));
+      card.append(node("h3", "", topic.title || ""));
+      if (topic.why) card.append(node("p", "topic-why", topic.why));
+      const words = topicWords(topic);
+      if (words.length) {
+        card.append(node("p", "topic-label", t("topicsWords")));
+        const list = node("ul", "topic-words");
+        for (const word of words) {
+          const item = document.createElement("li");
+          item.append(node("span", "spelling", word.spelling || ""));
+          item.append(node("span", "gloss", word.gloss || ""));
+          list.append(item);
+        }
+        card.append(list);
+      }
+      const prompts = Array.isArray(topic.prompts) ? topic.prompts.filter(Boolean) : [];
+      if (prompts.length) {
+        card.append(node("p", "topic-label", t("topicsPrompts")));
+        const lines = node("ul", "topic-prompts");
+        for (const line of prompts) lines.append(node("li", "", line));
+        card.append(lines);
+      }
+      const actions = node("div", "topic-actions");
+      if (topic.status === "suggested") {
+        const done = node("button", "primary", t("topicsMarkDone"));
+        done.type = "button";
+        done.onclick = () => updateTopicStatus(topic.id, "done");
+        const skip = node("button", "secondary", t("topicsSkip"));
+        skip.type = "button";
+        skip.onclick = () => updateTopicStatus(topic.id, "skipped");
+        actions.append(done, skip);
+      } else {
+        const undo = node("button", "secondary", t("topicsUndo"));
+        undo.type = "button";
+        undo.onclick = () => updateTopicStatus(topic.id, "suggested");
+        actions.append(undo);
+      }
+      card.append(actions);
+      return card;
+    }
+
+    function renderTopics() {
+      const list = document.querySelector("#topics-list");
+      const empty = document.querySelector("#topics-empty");
+      const button = document.querySelector("#topics-generate");
+      if (!list || !empty || !button) return;
+      document.querySelectorAll("[data-topics-filter]").forEach((filter) => {
+        filter.setAttribute("aria-pressed", filter.dataset.topicsFilter === topicsFilter ? "true" : "false");
+      });
+      const visible = topicsCache.filter((topic) => topic.status === topicsFilter);
+      list.replaceChildren();
+      for (const topic of visible) list.append(renderTopicCard(topic));
+      const emptyKeys = {
+        suggested: "topicsEmptySuggested",
+        done: "topicsEmptyDone",
+        skipped: "topicsEmptySkipped",
+      };
+      empty.hidden = visible.length > 0;
+      empty.textContent = visible.length ? "" : t(emptyKeys[topicsFilter] || "topicsEmptySuggested");
+      if (!topicsBusy) {
+        const hasSuggested = topicsCache.some((topic) => topic.status === "suggested");
+        button.textContent = t(hasSuggested ? "topicsAnother" : "topicsGenerate");
+      }
+    }
+
+    async function loadTopics() {
+      const requestId = ++topicsRequest;
+      const error = document.querySelector("#topics-error");
+      if (error) error.textContent = "";
+      try {
+        const response = await apiFetch(
+          "/api/topics?language=" + encodeURIComponent(learningLanguage),
+        );
+        const payload = await response.json();
+        if (requestId !== topicsRequest) return;
+        if (!response.ok) throw new Error(payload.error || "Could not load topics.");
+        topicsCache = Array.isArray(payload.topics) ? payload.topics : [];
+        topicsLoadedFor = learningLanguage;
+        renderTopics();
+      } catch (err) {
+        if (requestId !== topicsRequest) return;
+        if (error) error.textContent = err.message || "Could not load topics.";
+      }
+    }
+
+    async function updateTopicStatus(id, status) {
+      const error = document.querySelector("#topics-error");
+      if (error) error.textContent = "";
+      try {
+        await post("/api/topics?id=" + encodeURIComponent(id), {
+          status,
+          language: learningLanguage,
+        }, "PUT");
+        await loadTopics();
+      } catch (err) {
+        if (error) error.textContent = err.message || "Could not update that topic.";
+      }
+    }
+
+    async function generateTopic() {
+      const button = document.querySelector("#topics-generate");
+      const error = document.querySelector("#topics-error");
+      if (!button || topicsBusy) return;
+      topicsBusy = true;
+      button.disabled = true;
+      button.textContent = t("topicsThinking");
+      if (error) error.textContent = "";
+      try {
+        const saved = await post("/api/topics", { language: learningLanguage });
+        const ids = [saved.primary, ...(saved.alternates || [])]
+          .filter(Boolean)
+          .map((topic) => topic.id);
+        topicsFresh = new Set(ids);
+        topicsFilter = "suggested";
+        topicsLoadedFor = "";
+        await loadTopics();
+      } catch (err) {
+        if (error) error.textContent = err.message || "Could not make a topic.";
+      } finally {
+        topicsBusy = false;
+        button.disabled = false;
+        renderTopics();
+      }
     }
 
     function checklistStorageKey() {
@@ -2144,6 +2455,13 @@
 
     document.querySelectorAll(".tab").forEach((button) => {
       button.addEventListener("click", () => showTab(button.dataset.tab));
+    });
+    document.querySelector("#topics-generate").onclick = () => generateTopic();
+    document.querySelectorAll("[data-topics-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        topicsFilter = button.dataset.topicsFilter || "suggested";
+        renderTopics();
+      });
     });
 
     let cardsMode = "home";
