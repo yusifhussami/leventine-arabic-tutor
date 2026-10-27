@@ -366,6 +366,51 @@
       border-radius: 6px;
       background: var(--field);
     }
+    #pane-today.is-searching {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+    }
+    #pane-today.is-searching .document,
+    #pane-today.is-searching .inspector { display: none; }
+    .today-search {
+      grid-column: 1 / -1;
+      min-height: 0;
+      overflow: auto;
+      padding: 28px 40px 48px;
+    }
+    .today-search[hidden] { display: none; }
+    .today-search h2 { margin-bottom: 8px; }
+    #today-search-status:empty { display: none; }
+    .today-results {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+    .today-hit {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 16px;
+      width: 100%;
+      min-height: 44px;
+      margin: 0;
+      padding: 10px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--separator);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--label);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .today-hit:hover { background: var(--grouped); }
+    .today-hit .arabizi { flex: 0 1 auto; }
+    .today-hit-gloss {
+      color: var(--secondary);
+      font-size: 14px;
+      min-width: 0;
+    }
     .toolbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
     .sky {
       position: relative;
@@ -1334,6 +1379,8 @@
       .sidebar nav { flex-direction: row; flex-wrap: wrap; }
       .tab { width: auto; }
       .search-wrap { width: min(220px, 46vw); }
+      .today-search { padding: 20px 16px 32px; }
+      .today-hit { gap: 10px; }
       #pane-cards { padding: 20px 16px 34px; }
       .cards-home-header { align-items: flex-start; margin-bottom: 28px; }
       .cards-home-title h2 { font-size: 30px; }
@@ -1407,7 +1454,7 @@
       <header class="toolbar">
         <h1 id="toolbar-title">Today</h1>
         <div class="toolbar-end">
-          <div class="search-wrap" hidden>
+          <div class="search-wrap">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/>
               <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -1475,6 +1522,11 @@
               <p id="calendar-error" class="error"></p>
             </section>
           </aside>
+          <div id="today-search" class="today-search" hidden>
+            <h2 data-i18n="searchResults">Best matches</h2>
+            <p id="today-search-status" class="hint" aria-live="polite"></p>
+            <ul id="today-search-results" class="today-results"></ul>
+          </div>
         </div>
 
         <div id="pane-practice" class="pane" hidden>
@@ -1619,6 +1671,11 @@
     let topicsLoadedFor = "";
     let topicsRequest = 0;
     let topicsBusy = false;
+    let itemCache = [];
+    let searchSeq = 0;
+    let searchPending = false;
+    let cacheEpoch = 0;
+    let fullListSerial = 0;
 
     function normalizeLearningLanguage(value) {
       const raw = (value || "").toLowerCase();
@@ -1926,6 +1983,15 @@
       if (csvName && !pendingCsvText) csvName.textContent = t("noCsvChosen");
       paintAccount();
       if (changed && reload) {
+        itemCache = [];
+        clearTimeout(searchTimer);
+        searchSeq += 1;
+        cacheEpoch += 1;
+        const query = currentSearchQuery();
+        if (query) {
+          searchPending = true;
+          showSearchResults(query, [], { pending: true });
+        }
         resetTalkForLanguage();
         loadLibrary().catch(() => {});
         loadRecent().catch(() => {});
@@ -2087,7 +2153,7 @@
         settings: "tabSettings",
       };
       document.querySelector("#toolbar-title").textContent = t(titleKeys[name] || "tabToday");
-      document.querySelector(".search-wrap").hidden = name !== "words";
+      document.querySelector(".search-wrap").hidden = name !== "today" && name !== "words";
       if (name !== "cards") {
         clearCardWait();
         stopCardClock();
@@ -3537,26 +3603,137 @@
       }
     };
 
-    async function loadLibrary() {
-      const requestId = ++libraryRequest;
-      document.querySelector("#library-error").textContent = "";
-      const query = document.querySelector("#search").value.trim();
-      const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
-      let items;
-      try {
-        const response = await apiFetch(url);
-        items = await response.json();
-      } catch (err) {
-        if (requestId !== libraryRequest) return;
-        document.querySelector("#library-error").textContent = err.message || "Search failed.";
+    function currentSearchQuery() {
+      return document.querySelector("#search").value.trim();
+    }
+
+    function foldText(text) {
+      return String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[’‘]/g, "'")
+        .split(/\s+/)
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    function localLexicalMatches(query) {
+      const needle = foldText(query);
+      if (!needle) return [];
+      // Same ranks as lexicon.notebook.search_items, without the embed call.
+      const arabizi = /[2356789]/.test(needle);
+      const scored = [];
+      for (const item of itemCache) {
+        const spelling = foldText(item.spelling);
+        const gloss = foldText(item.gloss);
+        let score = 0;
+        let match = "";
+        if (spelling === needle) {
+          score = 1;
+          match = "spelling";
+        } else if (spelling.startsWith(needle)) {
+          score = 0.96;
+          match = "spelling";
+        } else if (spelling.includes(needle)) {
+          score = 0.92;
+          match = "spelling";
+        } else if (!arabizi && gloss === needle) {
+          score = 0.9;
+          match = "meaning";
+        } else if (!arabizi && gloss.includes(needle)) {
+          score = 0.86;
+          match = "meaning";
+        }
+        if (!match) continue;
+        scored.push(Object.assign({}, item, { match, score }));
+      }
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.spelling).localeCompare(String(b.spelling));
+      });
+      return scored.slice(0, 40);
+    }
+
+    function mergeSearchResults(localHits, serverItems) {
+      const server = Array.isArray(serverItems) ? serverItems : [];
+      const seen = new Set();
+      const merged = [];
+      for (const item of server) {
+        if (!item || seen.has(item.id)) continue;
+        seen.add(item.id);
+        merged.push(item);
+      }
+      const extras = [];
+      for (const item of localHits) {
+        if (!item || seen.has(item.id) || item.match !== "spelling") continue;
+        seen.add(item.id);
+        extras.push(item);
+      }
+      extras.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.spelling).localeCompare(String(b.spelling));
+      });
+      return merged.concat(extras);
+    }
+
+    function showSearchResults(query, items, { pending = false } = {}) {
+      renderLibrary(items, query, { pending });
+      renderTodaySearch(query, items, { pending });
+    }
+
+    function renderTodaySearch(query, items, { pending = false } = {}) {
+      const pane = document.querySelector("#pane-today");
+      const panel = document.querySelector("#today-search");
+      const list = document.querySelector("#today-search-results");
+      const status = document.querySelector("#today-search-status");
+      if (!query) {
+        pane.classList.remove("is-searching");
+        panel.hidden = true;
+        list.replaceChildren();
+        status.textContent = "";
         return;
       }
-      if (requestId !== libraryRequest) return;
+      pane.classList.add("is-searching");
+      panel.hidden = false;
+      list.replaceChildren();
+      const rows = Array.isArray(items) ? items : [];
+      if (!rows.length) {
+        status.textContent = pending ? "Searching…" : "No words match that search.";
+        return;
+      }
+      status.textContent = "";
+      for (const item of rows) {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "today-hit";
+        const spelling = document.createElement("span");
+        spelling.className = "arabizi";
+        spelling.textContent = item.spelling;
+        const gloss = document.createElement("span");
+        gloss.className = "today-hit-gloss";
+        gloss.textContent = item.gloss;
+        button.append(spelling, gloss);
+        button.addEventListener("click", () => openPractice(item));
+        li.append(button);
+        list.append(li);
+      }
+    }
+
+    function renderLibrary(items, query, { pending = false } = {}) {
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
-      if (!Array.isArray(items) || items.length === 0) {
+      const rows = Array.isArray(items) ? items : [];
+      if (rows.length === 0) {
         count.textContent = "";
+        if (query && pending) {
+          const pendingNote = document.createElement("p");
+          pendingNote.className = "empty";
+          pendingNote.textContent = "Searching…";
+          library.append(pendingNote);
+          return;
+        }
         const empty = document.createElement("p");
         empty.className = "empty";
         empty.textContent = query ? "No words match that search." : t("emptyLibrary");
@@ -3569,7 +3746,7 @@
         }
         return;
       }
-      count.textContent = t("wordCount")(items.length);
+      count.textContent = t("wordCount")(rows.length);
       if (query) {
         // Search stays in relevance order — do not regroup by lesson date.
         const heading = document.createElement("h3");
@@ -3577,33 +3754,114 @@
         library.append(heading);
         const table = document.createElement("table");
         const body = document.createElement("tbody");
-        for (const item of items) body.append(wordRow(item));
+        for (const item of rows) body.append(wordRow(item));
         table.append(body);
         library.append(table);
         return;
       }
       const groups = new Map();
-      for (const item of items) {
+      for (const item of rows) {
         if (!groups.has(item.learned_on)) groups.set(item.learned_on, []);
         groups.get(item.learned_on).push(item);
       }
-      for (const [date, rows] of groups) {
+      for (const [date, grouped] of groups) {
         const heading = document.createElement("h3");
         heading.textContent = formatDay(date);
         library.append(heading);
         const table = document.createElement("table");
         const body = document.createElement("tbody");
-        for (const item of rows) body.append(wordRow(item));
+        for (const item of grouped) body.append(wordRow(item));
         table.append(body);
         library.append(table);
       }
     }
 
+    function isUnrankedNotebook(items) {
+      return items.length > 0 && items.every((item) => !item || !("match" in item));
+    }
+
+    async function loadLibrary() {
+      const requestId = ++libraryRequest;
+      const seq = searchSeq;
+      const epoch = cacheEpoch;
+      const query = currentSearchQuery();
+      const ownsFullList = !query;
+      const listSerial = ownsFullList ? ++fullListSerial : fullListSerial;
+      document.querySelector("#library-error").textContent = "";
+      const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
+      let items;
+      try {
+        const response = await apiFetch(url);
+        items = await response.json();
+      } catch (err) {
+        if (requestId !== libraryRequest || seq !== searchSeq) return;
+        document.querySelector("#library-error").textContent = err.message || "Search failed.";
+        searchPending = false;
+        if (query) showSearchResults(query, localLexicalMatches(query), { pending: false });
+        return;
+      }
+      if (!Array.isArray(items)) items = [];
+      if (epoch !== cacheEpoch) return;
+      // Queries shorter than two characters come back as the whole notebook
+      // (no match tags). Keep that list as the cache; do not paint it as search hits.
+      const unranked = isUnrankedNotebook(items);
+      // A newer full-list fetch wins. If nothing has landed yet, keep this
+      // snapshot so the first keystrokes can match locally.
+      if ((ownsFullList || unranked) && (listSerial === fullListSerial || itemCache.length === 0)) {
+        itemCache = items;
+      }
+      const stale = requestId !== libraryRequest || seq !== searchSeq;
+      if (stale) {
+        const live = currentSearchQuery();
+        if (live && searchPending) {
+          showSearchResults(live, localLexicalMatches(live), { pending: true });
+        }
+        return;
+      }
+      searchPending = false;
+      if (!query) {
+        showSearchResults("", items, { pending: false });
+        return;
+      }
+      const display = unranked
+        ? localLexicalMatches(query)
+        : mergeSearchResults(localLexicalMatches(query), items);
+      showSearchResults(query, display, { pending: false });
+    }
+
     function scheduleLibrarySearch() {
+      const query = currentSearchQuery();
+      searchSeq += 1;
       clearTimeout(searchTimer);
+      document.querySelector("#library-error").textContent = "";
+      if (!query) {
+        searchPending = false;
+        renderTodaySearch("", []);
+        if (itemCache.length) renderLibrary(itemCache, "");
+        loadLibrary().catch(() => {});
+        return;
+      }
+      searchPending = true;
+      showSearchResults(query, localLexicalMatches(query), { pending: true });
       searchTimer = setTimeout(() => {
         loadLibrary().catch(() => {});
       }, 280);
+    }
+
+    function runLibrarySearchNow() {
+      searchSeq += 1;
+      clearTimeout(searchTimer);
+      const query = currentSearchQuery();
+      document.querySelector("#library-error").textContent = "";
+      if (!query) {
+        searchPending = false;
+        renderTodaySearch("", []);
+        if (itemCache.length) renderLibrary(itemCache, "");
+      } else {
+        searchPending = true;
+        showSearchResults(query, localLexicalMatches(query), { pending: true });
+      }
+      loadLibrary().catch(() => {});
     }
 
     function wordRow(item) {
@@ -3692,7 +3950,17 @@
     }
 
     async function loadRecent() {
+      const epoch = cacheEpoch;
+      const listSerial = ++fullListSerial;
       const items = await (await apiFetch("/api/items")).json();
+      if (epoch !== cacheEpoch || listSerial !== fullListSerial) return;
+      if (Array.isArray(items)) {
+        itemCache = items;
+        const query = currentSearchQuery();
+        if (query && searchPending) {
+          showSearchResults(query, localLexicalMatches(query), { pending: true });
+        }
+      }
       const recent = document.querySelector("#recent");
       const lessonIds = [];
       for (const item of items) {
@@ -4305,12 +4573,12 @@
       if (event.key !== "Enter") return;
       // type=search otherwise submits/refires and the list flickers.
       event.preventDefault();
-      clearTimeout(searchTimer);
-      loadLibrary().catch(() => {});
+      runLibrarySearchNow();
     });
     searchField.addEventListener("search", () => {
-      clearTimeout(searchTimer);
-      loadLibrary().catch(() => {});
+      // Clear button. Enter is already handled on keydown.
+      if (currentSearchQuery()) return;
+      runLibrarySearchNow();
     });
     bootAuth().then(() => {
       if (clerk && !clerk.user) return;
