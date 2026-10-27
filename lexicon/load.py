@@ -193,6 +193,22 @@ CREATE TABLE IF NOT EXISTS study_cards (
 );
 
 CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards (deck_id, suspended, due_at);
+
+-- Lesson conversation topics generated from saved words.
+-- payload is the model JSON; target_words cites lesson_items ids and spellings.
+CREATE TABLE IF NOT EXISTS lesson_topics (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'arabic',
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('suggested', 'done', 'skipped')),
+    target_words TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_topics_user_lang
+    ON lesson_topics (user_id, language, created_at DESC, id ASC);
 """
 
 
@@ -256,6 +272,23 @@ def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
                 ALTER TABLE settings_v2 RENAME TO settings;
                 """
             )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lesson_topics (
+            id INTEGER PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            language TEXT NOT NULL DEFAULT 'arabic',
+            title TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('suggested', 'done', 'skipped')),
+            target_words TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_lesson_topics_user_lang
+            ON lesson_topics (user_id, language, created_at DESC, id ASC);
+        """
+    )
     conn.commit()
 
 
