@@ -11,10 +11,12 @@ from urllib.parse import parse_qs, urlparse
 from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
 from lexicon.cards import dispatch_get, dispatch_post, import_apkg
 from lexicon.db import LOCAL_USER, open_db
+from lexicon.http_api import file_response
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.notebook import (
     drop_exact_duplicates,
+    export_words_csv,
     import_csv,
     judge_saved_item,
     list_items,
@@ -99,7 +101,19 @@ class NotebookHandler(BaseHTTPRequestHandler):
             try:
                 language = get_language(conn, LOCAL_USER)
                 drop_exact_duplicates(conn, LOCAL_USER, language=language)
-                query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+                params = parse_qs(urlparse(self.path).query)
+                if (params.get("format", [""])[0] or "").strip().lower() == "csv":
+                    filename, text = export_words_csv(
+                        conn, user_id=LOCAL_USER, language=language
+                    )
+                    file_response(
+                        self,
+                        text.encode("utf-8"),
+                        "text/csv; charset=utf-8",
+                        filename,
+                    )
+                    return
+                query = params.get("q", [""])[0]
                 self._json(
                     200,
                     search_items(conn, query, user_id=LOCAL_USER, language=language)

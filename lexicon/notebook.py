@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import math
 import re
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import (
@@ -472,6 +474,69 @@ def list_items(
         (user_id, learning),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def export_headers(language: str | None) -> list[str]:
+    """Spreadsheet titles for one learning language.
+
+    Arabizi and Spelling, English, and Date Added are names the CSV import
+    already accepts, so a downloaded file can be imported again. Kind and
+    Language are extra. Arabic script, examples, topics, and status are not
+    columns on a saved word.
+    """
+    learning = normalize_language(language)
+    spelling = "Arabizi" if learning == "arabic" else "Spelling"
+    return [spelling, "English", "Kind", "Date Added", "Language"]
+
+
+def words_csv(items: list[dict], language: str | None = None) -> str:
+    """UTF-8 CSV text, with a BOM, for rows the caller already scoped.
+
+    Oldest lesson day first, then spelling. Commas, quotes, and newlines are
+    quoted the way Excel and Google Sheets expect.
+    """
+    learning = normalize_language(language)
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(export_headers(learning))
+    label = learning_label(learning)
+    for item in sorted(items, key=_export_sort_key):
+        writer.writerow(
+            [
+                item.get("spelling") or "",
+                item.get("gloss") or "",
+                item.get("kind") or "",
+                item.get("learned_on") or "",
+                label,
+            ]
+        )
+    return "\ufeff" + buffer.getvalue()
+
+
+def _export_sort_key(item: dict) -> tuple:
+    return (
+        str(item.get("learned_on") or ""),
+        str(item.get("spelling") or "").casefold(),
+        str(item.get("gloss") or "").casefold(),
+        int(item.get("id") or 0),
+    )
+
+
+def export_filename(day: date | None = None) -> str:
+    stamp = day or datetime.now(timezone.utc).date()
+    return f"sawt-words-{stamp.isoformat()}.csv"
+
+
+def export_words_csv(
+    conn,
+    user_id: str = LOCAL_USER,
+    language: str | None = None,
+    exported_on: date | None = None,
+) -> tuple[str, str]:
+    """Every saved word for this user and learning language, as a CSV download."""
+    learning = _learning(conn, user_id, language)
+    items = list_items(conn, user_id=user_id, language=learning)
+    return export_filename(exported_on), words_csv(items, learning)
 
 
 def update_item(

@@ -13,3 +13,4 @@ Notes on the AI choices in Sawt: which model, why that one, and how the call is 
 | [007-metalanguage.md](007-metalanguage.md) | Language you’re learning: Arabic or Japanese |
 | [008-topics.md](008-topics.md) | Lesson topics from saved words, not Talk scenes |
 | [009-today-search.md](009-today-search.md) | Today + Words search: English gloss locally, then `/api/items` |
+| [010-export-words.md](010-export-words.md) | Export the current language’s words as a CSV from `/api/items?format=csv` |

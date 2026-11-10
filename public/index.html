@@ -545,6 +545,21 @@
     #talk-typed { margin-top: 10px; }
     .count { margin: 0 2px 4px; color: var(--secondary); }
     .count:empty { display: none; }
+    .words-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin: 0 0 8px;
+      padding: 0 0 8px;
+      background: var(--window);
+    }
+    .words-bar .count { margin: 0; }
+    #export-words { flex-shrink: 0; }
+    #export-words:disabled { opacity: 0.55; }
     #practice[hidden], #practice-empty[hidden] { display: none; }
     #pane-practice #practice {
       background: var(--window);
@@ -1590,7 +1605,10 @@
         </div>
 
         <div id="pane-words" class="pane" hidden>
-          <p id="word-count" class="count"></p>
+          <div class="words-bar">
+            <p id="word-count" class="count"></p>
+            <button id="export-words" class="secondary" type="button" data-i18n="exportWords" data-i18n-aria="exportWordsAria" aria-label="Download every saved word in this language as a CSV file">Export CSV</button>
+          </div>
           <p id="library-error" class="error"></p>
           <div id="library"></div>
         </div>
@@ -1759,6 +1777,10 @@
       noLesson: "No upcoming Preply lesson on that calendar.",
       calendarReadError: "Could not read the calendar.",
       wordCount: (n) => (n === 1 ? "1 word" : n + " words"),
+      exportWords: "Export CSV",
+      exportWordsBusy: "Exporting…",
+      exportWordsAria: "Download every saved word in this language as a CSV file",
+      exportFailed: "Could not export words.",
       edit: "Edit",
       save: "Save",
       cancel: "Cancel",
@@ -3718,6 +3740,62 @@
         li.append(button);
         list.append(li);
       }
+    }
+
+    document.querySelector("#export-words").onclick = () => {
+      exportWords().catch((err) => {
+        document.querySelector("#library-error").textContent =
+          err.message || t("exportFailed");
+      });
+    };
+
+    async function exportWords() {
+      const button = document.querySelector("#export-words");
+      const error = document.querySelector("#library-error");
+      error.textContent = "";
+      button.disabled = true;
+      button.textContent = t("exportWordsBusy");
+      try {
+        const response = await apiFetch("/api/items?format=csv");
+        if (!response.ok) {
+          let message = t("exportFailed");
+          try {
+            const payload = await response.json();
+            if (payload && payload.error) message = payload.error;
+          } catch (err) {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const named = /filename="([^"]+)"/.exec(
+          response.headers.get("Content-Disposition") || "",
+        );
+        const filename = named ? named[1] : fallbackCsvName();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      } finally {
+        button.disabled = false;
+        button.textContent = t("exportWords");
+      }
+    }
+
+    function fallbackCsvName() {
+      const now = new Date();
+      return (
+        "sawt-words-" +
+        [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+        ].join("-") +
+        ".csv"
+      );
     }
 
     function renderLibrary(items, query, { pending = false } = {}) {
