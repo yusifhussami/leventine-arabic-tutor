@@ -14,11 +14,19 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is require
 
 - **Today** is where a lesson gets pasted. Arabic: `baza5 = fancy` or `practice - tadreeb`. Japanese: `hello - konnichiwa` or `mizu = water` (romaji). Preview shows the split before you save.
 - **Settings** (under Words) has account sign-in and **Language you’re learning** (Levantine Arabic or Japanese). UI stays English; mic, TTS, spellings, and your word list follow the choice — each language has its own notebook on the account. **Import a CSV** on Today: Arabic sheets use Word/Arabizi + Meaning; Japanese sheets use Kanji + Kana (hiragana/katakana) + Meaning — practice stores kana, with kanji kept on the meaning line. Date Added groups rows by lesson day; rows without a date use the lesson date field.
-- **Words** lists everything saved, grouped by the lesson date. Edit changes the Latin spelling or the meaning. A spelling with a space is stored as a phrase. **Export CSV** downloads every word in the current language as `sawt-words-YYYY-MM-DD.csv` (UTF-8, so Arabic script opens in Excel).
+- **Words** lists everything saved, grouped by the lesson date. Levantine rows show the Arabic spelling beside the Arabizi (right to left). Edit changes the Arabizi, the Arabic, or the meaning. An Arabic edit is kept; a later fill will not replace it. A spelling with a space is stored as a phrase. **Export CSV** downloads every word in the current language as `sawt-words-YYYY-MM-DD.csv` (UTF-8). Levantine files put Arabic between Arabizi and English. Japanese files have no Arabic column.
 - **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance.
 - **Topics** proposes one situation for the next lesson from words already saved, plus a few alternates. Mark it done after you use it with Amer, or skip it. The next suggestion avoids titles you already did. Arabic examples stay Levantine Arabizi; Japanese examples stay romaji. The app stays in English.
 
 Arabizi digits (Arabic): 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Long ee and oo stay as ee and oo. كيفك is keefak. Japanese mode uses Hepburn romaji on the page and Japanese script for speech.
+
+Arabic spellings are filled after a save, and for words already in the notebook:
+
+```bash
+python3 -m lexicon.arabic_script
+```
+
+With `DATABASE_URL` set, that writes the hosted notebook. Without it, the local `lexicon.db`. It checks English Wiktionary first (the gloss picks the sense, the Arabizi picks the line) and asks the OpenRouter model when Wiktionary has no match. Running it again skips spellings that are already filled, including ones you edited. `--user` limits it to one account. See [docs/decisions/011-arabic-script.md](docs/decisions/011-arabic-script.md).
 
 The next Preply or Arabic lesson shows in the side column after you paste the private Google Calendar iCal link. That link stays in the database. It is not printed on the page and it is not included in errors.
 
