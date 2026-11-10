@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS lesson_items (
     spelling TEXT NOT NULL,
     gloss TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('word', 'phrase')),
+    arabic_script TEXT NOT NULL DEFAULT '',
+    arabic_source TEXT NOT NULL DEFAULT '',
     UNIQUE (lesson_id, position)
 );
 
@@ -103,7 +105,20 @@ CREATE TABLE IF NOT EXISTS lesson_topics (
     payload TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS script_cache (
+    cache_key TEXT PRIMARY KEY,
+    payload TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
 """
+
+# Idempotent upgrades for databases created before these columns existed.
+# Postgres accepts IF NOT EXISTS. SQLite uses a column check in load.py.
+ARABIC_ITEM_ALTERS = (
+    "ALTER TABLE lesson_items ADD COLUMN IF NOT EXISTS arabic_script TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE lesson_items ADD COLUMN IF NOT EXISTS arabic_source TEXT NOT NULL DEFAULT ''",
+)
 
 
 class PgConnection:
@@ -192,6 +207,8 @@ def open_postgres(url: str) -> PgConnection:
                     wrapped.execute(
                         "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'arabic'"
                     )
+                    for statement in ARABIC_ITEM_ALTERS:
+                        wrapped.execute(statement)
                     wrapped.execute(
                         "CREATE INDEX IF NOT EXISTS idx_lessons_user "
                         "ON lessons (user_id, learned_on DESC, id DESC)"
