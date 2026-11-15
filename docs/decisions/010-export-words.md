@@ -13,12 +13,13 @@ Columns, in order:
 | Column | Stored as |
 | --- | --- |
 | Arabizi, or Spelling when the language is Japanese | `lesson_items.spelling` |
+| Arabic (Levantine files only; see 011) | `lesson_items.arabic_script` |
 | English | `lesson_items.gloss` |
 | Kind | `word` or `phrase` |
 | Date Added | `lessons.learned_on` |
 | Language | Levantine Arabic or Japanese |
 
-Rows are oldest lesson day first, then spelling. The file is UTF-8 with a BOM, Windows line endings, and normal CSV quoting (commas, quotes, and newlines). Arabizi such as `3are9'` and `b-y-a7ko` is written as stored. The spelling, English, and date headers are names the CSV import already accepts, so the file can be imported again.
+Rows are oldest lesson day first, then spelling. The file is UTF-8 with a BOM, Windows line endings, and normal CSV quoting (commas, quotes, and newlines). Arabizi such as `3are9'` and `b-y-a7ko` is written as stored. The spelling, English, and date headers are names the CSV import already accepts, so the file can be imported again. Levantine files also include an Arabic column beside Arabizi; see 011.
 
 The page fetches the file with the Clerk bearer token and saves the blob. A plain link would not send that token.
 
@@ -28,7 +29,7 @@ Vercel Hobby allows 12 Python files under `api/`, and this project is already at
 
 Generating the CSV in the browser would have copied the quoting rules into the page, with no Python test. The formatter lives next to the notebook so the quoting, the BOM, and the column order are tested once.
 
-Arabic script, examples, topics, and a per-word status are not fields on a saved word. Topics are their own table. Japanese kanji, when it was imported, already sits on the English line (`hello · 今日は`). An empty column for data we do not store would look like a blank sheet.
+Examples, topics, and a per-word status are not fields on a saved word. Topics are their own table. Japanese kanji, when it was imported, already sits on the English line (`hello · 今日は`). Arabic script was added in 011 and is its own column on Levantine exports only.
 
 ## What I rejected
 

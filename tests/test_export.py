@@ -49,6 +49,7 @@ class WordsCsvTests(unittest.TestCase):
                     "gloss": "sweat",
                     "kind": "word",
                     "learned_on": "2026-01-15",
+                    "arabic_script": "عرق",
                 },
                 {
                     "id": 4,
@@ -68,20 +69,21 @@ class WordsCsvTests(unittest.TestCase):
         self.assertIn(b"\r\n", raw)
         self.assertIn(b'"she said ""hello"", then left"', raw)
         # Apostrophes, digits, and hyphens do not need quotes.
-        self.assertIn("\r\n3are9',sweat,word,2026-01-15,Levantine Arabic\r\n", text)
+        self.assertIn("\r\n3are9',عرق,sweat,word,2026-01-15,Levantine Arabic\r\n", text)
         rows = _rows(text)
         self.assertEqual(
             rows[0],
-            ["Arabizi", "English", "Kind", "Date Added", "Language"],
+            ["Arabizi", "Arabic", "English", "Kind", "Date Added", "Language"],
         )
         self.assertEqual(
             rows[1:],
             [
-                ["3are9'", "sweat", "word", "2026-01-15", "Levantine Arabic"],
-                ["ya reet", "I wish", "phrase", "2026-01-15", "Levantine Arabic"],
-                ["مرحبا", "hello\nthere", "word", "2026-01-15", "Levantine Arabic"],
+                ["3are9'", "عرق", "sweat", "word", "2026-01-15", "Levantine Arabic"],
+                ["ya reet", "", "I wish", "phrase", "2026-01-15", "Levantine Arabic"],
+                ["مرحبا", "", "hello\nthere", "word", "2026-01-15", "Levantine Arabic"],
                 [
                     "b-y-a7ko",
+                    "",
                     'she said "hello", then left',
                     "word",
                     "2026-04-02",
@@ -90,7 +92,7 @@ class WordsCsvTests(unittest.TestCase):
             ],
         )
         for row in rows:
-            self.assertEqual(len(row), 5)
+            self.assertEqual(len(row), 6)
 
     def test_parsed_sheet_keeps_the_same_cells(self) -> None:
         text = words_csv(
@@ -147,7 +149,7 @@ class WordsCsvTests(unittest.TestCase):
         rows = _rows(words_csv([], language="arabic"))
         self.assertEqual(
             rows,
-            [["Arabizi", "English", "Kind", "Date Added", "Language"]],
+            [["Arabizi", "Arabic", "English", "Kind", "Date Added", "Language"]],
         )
 
 
@@ -215,7 +217,7 @@ class ExportWordsTests(unittest.TestCase):
             [row[0] for row in rows[1:]],
             ["3are9'", "b-y-a7ko"],
         )
-        self.assertEqual(rows[2][1], 'she said "hello", then left')
+        self.assertEqual(rows[2][2], 'she said "hello", then left')
         self.assertNotIn("ahwe", text)
         self.assertNotIn("mizu", text)
         self.assertNotIn("water", text)

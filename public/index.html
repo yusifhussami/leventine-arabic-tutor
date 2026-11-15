@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f2f2f7">
   <title>Sawt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500;600&display=swap" rel="stylesheet">
   <script>
     (function () {
       const saved = localStorage.getItem("appearance");
@@ -285,6 +288,41 @@
       font-size: 16px;
       font-weight: 500;
     }
+    .arabic-script {
+      font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Traditional Arabic", serif;
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1.45;
+      direction: rtl;
+      unicode-bidi: isolate;
+    }
+    td.arabic-col,
+    th.arabic-col {
+      width: 1%;
+      white-space: nowrap;
+      padding-inline-start: 8px;
+      padding-inline-end: 22px;
+    }
+    th.arabic-col {
+      font-family: var(--ui);
+      font-size: 11px;
+      font-weight: 600;
+      direction: ltr;
+      text-align: left;
+    }
+    .arabic-script:empty { padding: 0; }
+    #library td input.arabic-script {
+      font-size: 20px;
+      width: 100%;
+      min-width: 7em;
+      text-align: right;
+    }
+    #practice-title .arabic-script {
+      margin-inline-start: 14px;
+      font-size: 40px;
+      vertical-align: middle;
+    }
+    .today-hit .arabic-script { font-size: 22px; }
     .kind {
       color: var(--secondary);
       font-size: 11px;
@@ -1821,6 +1859,7 @@
         lessonHint: "Each Arabizi spelling stays with its English meaning.",
         pastePlaceholder: "eb7as - to search\n6awaret - I developed\n8ararat = decisions",
         colArabizi: "Arabizi",
+        colArabic: "Arabic",
         colGloss: "English",
         typeArabizi: "Or type in Arabizi",
         sentencePlaceholder: "Arabizi that uses this word",
@@ -2529,11 +2568,14 @@
         const previous = learningLanguage;
         const error = document.querySelector("#language-error");
         error.textContent = "";
-        // Save immediately in the browser, then on the account.
-        applyLanguage(language, { animate: true, reload: true });
+        // Flip the labels now. Load the notebook only after the account has switched,
+        // so the list is not a stale copy of the other language.
+        applyLanguage(language, { animate: true, reload: false });
         try {
           const saved = await post("/api/settings", { language });
           applyLanguage(saved.language || language, { reload: false });
+          await loadLibrary();
+          loadRecent().catch(() => {});
         } catch (err) {
           error.textContent = err.message || "Could not save language.";
           applyLanguage(previous, { reload: true });
@@ -3564,6 +3606,7 @@
         await loadLibrary();
         await loadRecent();
         showTab("words");
+        requestArabicFill((saved.items || []).map((item) => item.id));
       } catch (err) {
         error.className = "error";
         error.textContent = err.message;
@@ -3618,6 +3661,7 @@
         await loadLibrary();
         await loadRecent();
         showTab("words");
+        requestArabicFill(saved.item_ids || []);
       } catch (err) {
         error.className = "error";
         error.textContent = err.message;
@@ -3648,6 +3692,7 @@
       for (const item of itemCache) {
         const spelling = foldText(item.spelling);
         const gloss = foldText(item.gloss);
+        const arabic = foldText(item.arabic_script);
         let score = 0;
         let match = "";
         if (spelling === needle) {
@@ -3658,6 +3703,9 @@
           match = "spelling";
         } else if (spelling.includes(needle)) {
           score = 0.92;
+          match = "spelling";
+        } else if (arabic && (arabic === needle || arabic.includes(needle))) {
+          score = 0.94;
           match = "spelling";
         } else if (!arabizi && gloss === needle) {
           score = 0.9;
@@ -3735,7 +3783,10 @@
         const gloss = document.createElement("span");
         gloss.className = "today-hit-gloss";
         gloss.textContent = item.gloss;
-        button.append(spelling, gloss);
+        button.append(spelling);
+        const arabic = arabicSpan(item);
+        if (arabic) button.append(arabic);
+        button.append(gloss);
         button.addEventListener("click", () => openPractice(item));
         li.append(button);
         list.append(li);
@@ -3830,11 +3881,7 @@
         const heading = document.createElement("h3");
         heading.textContent = t("searchResults");
         library.append(heading);
-        const table = document.createElement("table");
-        const body = document.createElement("tbody");
-        for (const item of rows) body.append(wordRow(item));
-        table.append(body);
-        library.append(table);
+        library.append(wordsTable(rows));
         return;
       }
       const groups = new Map();
@@ -3846,12 +3893,31 @@
         const heading = document.createElement("h3");
         heading.textContent = formatDay(date);
         library.append(heading);
-        const table = document.createElement("table");
-        const body = document.createElement("tbody");
-        for (const item of grouped) body.append(wordRow(item));
-        table.append(body);
-        library.append(table);
+        library.append(wordsTable(grouped));
       }
+    }
+
+    function wordsTable(items) {
+      const table = document.createElement("table");
+      if (learningLanguage === "arabic") {
+        const head = document.createElement("thead");
+        const labels = document.createElement("tr");
+        for (const label of [t("colArabizi"), t("colArabic"), t("colGloss"), "", ""]) {
+          const th = document.createElement("th");
+          th.textContent = label;
+          if (label === t("colArabic")) {
+            th.className = "arabic-col";
+            th.title = "Levantine spelling. Dictionary matches come from English Wiktionary (CC BY-SA).";
+          }
+          labels.append(th);
+        }
+        head.append(labels);
+        table.append(head);
+      }
+      const body = document.createElement("tbody");
+      for (const item of items) body.append(wordRow(item));
+      table.append(body);
+      return table;
     }
 
     function isUnrankedNotebook(items) {
@@ -3942,6 +4008,66 @@
       loadLibrary().catch(() => {});
     }
 
+    function arabicSourceTitle(source) {
+      if (source === "user") return "Arabic spelling you edited";
+      if (source === "dictionary") return "Arabic spelling from English Wiktionary";
+      if (source === "ai") return "Arabic spelling suggested from the Arabizi";
+      return "Arabic spelling";
+    }
+
+    function arabicSpan(item) {
+      if (learningLanguage !== "arabic" || !item || !item.arabic_script) return null;
+      const script = document.createElement("span");
+      script.className = "arabic-script";
+      script.dir = "rtl";
+      script.lang = "ar";
+      script.textContent = item.arabic_script;
+      script.title = arabicSourceTitle(item.arabic_source);
+      return script;
+    }
+
+    function arabicCell(item) {
+      const cell = document.createElement("td");
+      cell.className = "arabic-script arabic-col";
+      cell.dir = "rtl";
+      cell.lang = "ar";
+      cell.textContent = (item && item.arabic_script) || "";
+      cell.title = arabicSourceTitle(item && item.arabic_source);
+      return cell;
+    }
+
+    function paintPracticeTitle(item) {
+      const title = document.querySelector("#practice-title");
+      title.replaceChildren();
+      title.append(document.createTextNode(item.spelling || ""));
+      const script = arabicSpan(item);
+      if (script) title.append(script);
+    }
+
+    let arabicFillToken = 0;
+
+    async function requestArabicFill(ids) {
+      if (learningLanguage !== "arabic" || !Array.isArray(ids) || !ids.length) return;
+      const token = ++arabicFillToken;
+      let pending = ids.filter((id) => id != null);
+      for (let round = 0; round < 8 && pending.length && token === arabicFillToken; round += 1) {
+        let result;
+        try {
+          result = await post("/api/items", { action: "fill-arabic", ids: pending });
+        } catch (err) {
+          return;
+        }
+        if (token !== arabicFillToken) return;
+        if (result.filled) {
+          await loadLibrary();
+          await loadRecent();
+        }
+        const next = Array.isArray(result.remaining_ids) ? result.remaining_ids : [];
+        if (!result.filled || next.length >= pending.length) return;
+        pending = next;
+      }
+    }
+
     function wordRow(item) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
@@ -3964,7 +4090,8 @@
       edit.textContent = t("edit");
       edit.onclick = () => beginEdit(row, item);
       editCell.append(edit);
-      row.append(cell, gloss, kind, editCell);
+      if (learningLanguage === "arabic") row.append(cell, arabicCell(item), gloss, kind, editCell);
+      else row.append(cell, gloss, kind, editCell);
       return row;
     }
 
@@ -3979,8 +4106,17 @@
       gloss.type = "text";
       gloss.value = item.gloss;
       gloss.setAttribute("aria-label", t("glossAria"));
+      const arabic = document.createElement("input");
+      arabic.type = "text";
+      arabic.className = "arabic-script";
+      arabic.dir = "rtl";
+      arabic.lang = "ar";
+      arabic.value = item.arabic_script || "";
+      arabic.setAttribute("aria-label", "Arabic");
       const spellingCell = document.createElement("td");
       spellingCell.append(spelling);
+      const arabicEditCell = document.createElement("td");
+      arabicEditCell.append(arabic);
       const glossCell = document.createElement("td");
       glossCell.colSpan = 2;
       glossCell.append(gloss);
@@ -3994,30 +4130,35 @@
       cancel.className = "text";
       cancel.type = "button";
       cancel.textContent = t("cancel");
-      save.onclick = () => saveEdit(item, spelling.value, gloss.value);
+      const commit = () => saveEdit(item, spelling.value, gloss.value, learningLanguage === "arabic" ? arabic.value : undefined);
+      save.onclick = commit;
       cancel.onclick = () => loadLibrary();
       const onKey = (event) => {
-        if (event.key === "Enter") saveEdit(item, spelling.value, gloss.value);
+        if (event.key === "Enter") commit();
         if (event.key === "Escape") loadLibrary();
       };
       spelling.onkeydown = onKey;
       gloss.onkeydown = onKey;
+      arabic.onkeydown = onKey;
       actions.append(save, cancel);
-      row.replaceChildren(spellingCell, glossCell, actions);
+      if (learningLanguage === "arabic") row.replaceChildren(spellingCell, arabicEditCell, glossCell, actions);
+      else row.replaceChildren(spellingCell, glossCell, actions);
       spelling.focus();
     }
 
-    async function saveEdit(item, spelling, gloss) {
+    async function saveEdit(item, spelling, gloss, arabic) {
       const libraryError = document.querySelector("#library-error");
       libraryError.textContent = "";
+      const body = { spelling, gloss };
+      if (arabic !== undefined) body.arabic_script = arabic;
       try {
         const saved = await post(
           "/api/items/" + item.id,
-          { spelling, gloss },
+          body,
           "PUT",
         );
         if (currentId === item.id) {
-          document.querySelector("#practice-title").textContent = saved.spelling;
+          paintPracticeTitle(saved);
           document.querySelector("#practice-gloss").textContent = saved.gloss;
         }
         await loadLibrary();
@@ -4081,7 +4222,8 @@
           const kind = document.createElement("td");
           kind.className = "kind";
           kind.textContent = item.kind;
-          row.append(spelling, gloss, kind);
+          if (learningLanguage === "arabic") row.append(spelling, arabicCell(item), gloss, kind);
+          else row.append(spelling, gloss, kind);
           body.append(row);
         }
         table.append(body);
@@ -4094,7 +4236,7 @@
       document.querySelector("#practice-empty").hidden = true;
       const panel = document.querySelector("#practice");
       panel.hidden = false;
-      document.querySelector("#practice-title").textContent = item.spelling;
+      paintPracticeTitle(item);
       document.querySelector("#practice-gloss").textContent = item.gloss;
       document.querySelector("#sentence").value = "";
       const judgment = document.querySelector("#judgment");

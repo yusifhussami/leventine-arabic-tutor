@@ -31,12 +31,15 @@ class handler(BaseHTTPRequestHandler):
             body = read_json(self)
 
             def work(conn):
+                # Absent arabic_script leaves the column alone. An empty string clears it.
+                script = body["arabic_script"] if "arabic_script" in body else None
                 return update_item(
                     conn,
                     item_id,
                     body.get("spelling") or "",
                     body.get("gloss") or "",
                     user_id=user_id,
+                    arabic_script=script,
                 )
 
             json_response(self, 200, with_db(work))

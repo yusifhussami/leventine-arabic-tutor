@@ -260,14 +260,20 @@ def import_csv(
             continue
         seen.add(key)
         day = _csv_day(row.get("date_added") or "", fallback)
-        by_day.setdefault(day, []).append((spelling, gloss, kind))
+        # The Arabic cell describes the Arabizi column. A swapped row would
+        # point that cell at the English, so only keep it when the spelling
+        # is still the original word column.
+        arabic = ""
+        if learning == "arabic" and normalize_word(spelling) == normalize_word(row.get("word") or ""):
+            arabic = (row.get("arabic") or "").strip()
+        by_day.setdefault(day, []).append((spelling, gloss, kind, arabic))
     if not by_day:
         raise ValueError("no new words found in that CSV")
-    added = 0
+    item_ids: list[int] = []
     for day, triples in by_day.items():
-        added += _store_imported_day(conn, day, triples, embed, user_id, learning)
+        item_ids.extend(_store_imported_day(conn, day, triples, embed, user_id, learning))
     _refresh_words_deck(conn, user_id)
-    return {"days": len(by_day), "items": added}
+    return {"days": len(by_day), "items": len(item_ids), "item_ids": item_ids}
 
 
 def _csv_day(value: str, fallback: str) -> str:
@@ -296,7 +302,7 @@ def _commit_imported_days(conn, by_day, embed, user_id: str, language: str) -> d
         if exists:
             continue
         days += 1
-        added += _store_imported_day(conn, day, triples, embed, user_id, learning)
+        added += len(_store_imported_day(conn, day, triples, embed, user_id, learning))
     if added:
         _refresh_words_deck(conn, user_id)
     return {"days": days, "items": added}
@@ -311,11 +317,18 @@ def _refresh_words_deck(conn, user_id: str) -> None:
 
 def _store_imported_day(
     conn, day: str, triples, embed, user_id: str = LOCAL_USER, language: str = "arabic"
-) -> int:
+) -> list[int]:
     learning = normalize_language(language)
-    spellings = [(spelling, gloss, kind) for spelling, gloss, kind in triples]
+    spellings = []
+    for triple in triples:
+        arabic = ""
+        if len(triple) >= 4:
+            spelling, gloss, kind, arabic = triple[0], triple[1], triple[2], triple[3] or ""
+        else:
+            spelling, gloss, kind = triple
+        spellings.append((spelling, gloss, kind, arabic))
     vectors: list[list[float] | None] = []
-    glosses = [gloss for _, gloss, _ in spellings]
+    glosses = [gloss for _, gloss, _, _ in spellings]
     for start in range(0, len(glosses), _BATCH):
         chunk = glosses[start : start + _BATCH]
         try:
@@ -332,21 +345,29 @@ def _store_imported_day(
             "VALUES (?, ?, ?, ?, ?)",
             (user_id, learning, day, _IMPORT_MARK, created_at),
         )
-        for position, ((spelling, gloss, kind), vector) in enumerate(zip(spellings, vectors)):
+        stored_ids: list[int] = []
+        for position, ((spelling, gloss, kind, arabic), vector) in enumerate(zip(spellings, vectors)):
+            script = (arabic or "").strip()
+            source = "user" if script and learning == "arabic" else ""
+            if learning != "arabic":
+                script = ""
             item_id = insert_id(
                 conn,
                 """
-                INSERT INTO lesson_items (lesson_id, position, spelling, gloss, kind)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO lesson_items (
+                    lesson_id, position, spelling, gloss, kind, arabic_script, arabic_source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (lesson_id, position, spelling, gloss, kind),
+                (lesson_id, position, spelling, gloss, kind, script, source),
             )
+            stored_ids.append(item_id)
             if vector:
                 conn.execute(
                     "INSERT INTO lesson_embeddings (item_id, model, vector) VALUES (?, ?, ?)",
                     (item_id, EMBED_MODEL, json.dumps(vector)),
                 )
-    return len(spellings)
+    return stored_ids
 
 
 def search_items(
@@ -371,6 +392,7 @@ def search_items(
     for item in items:
         spelling = _fold(item["spelling"])
         gloss = _fold(item["gloss"])
+        arabic = _fold(item.get("arabic_script") or "")
         score = 0.0
         match = ""
         if spelling == needle:
@@ -379,6 +401,8 @@ def search_items(
             score, match = 0.96, "spelling"
         elif needle in spelling:
             score, match = 0.92, "spelling"
+        elif arabic and (arabic == needle or needle in arabic):
+            score, match = 0.94, "spelling"
         elif not arabizi and gloss == needle:
             score, match = 0.9, "meaning"
         elif not arabizi and needle in gloss:
@@ -405,7 +429,8 @@ def search_items(
 
     stored = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, e.vector
+        SELECT i.id, i.spelling, i.gloss, i.kind, i.arabic_script, i.arabic_source,
+               l.learned_on, l.id AS lesson_id, e.vector
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
@@ -427,6 +452,8 @@ def search_items(
                     "spelling": row["spelling"],
                     "gloss": row["gloss"],
                     "kind": row["kind"],
+                    "arabic_script": row["arabic_script"],
+                    "arabic_source": row["arabic_source"],
                     "learned_on": row["learned_on"],
                     "lesson_id": row["lesson_id"],
                     "match": "meaning",
@@ -465,7 +492,8 @@ def list_items(
     learning = _learning(conn, user_id, language)
     rows = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, l.language
+        SELECT i.id, i.spelling, i.gloss, i.kind, i.arabic_script, i.arabic_source,
+               l.learned_on, l.id AS lesson_id, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE l.user_id = ? AND l.language = ?
@@ -479,14 +507,14 @@ def list_items(
 def export_headers(language: str | None) -> list[str]:
     """Spreadsheet titles for one learning language.
 
-    Arabizi and Spelling, English, and Date Added are names the CSV import
+    Arabizi, Arabic, Spelling, English, and Date Added are names the CSV import
     already accepts, so a downloaded file can be imported again. Kind and
-    Language are extra. Arabic script, examples, topics, and status are not
-    columns on a saved word.
+    Language are extra. Japanese has no Arabic column.
     """
     learning = normalize_language(language)
-    spelling = "Arabizi" if learning == "arabic" else "Spelling"
-    return [spelling, "English", "Kind", "Date Added", "Language"]
+    if learning == "arabic":
+        return ["Arabizi", "Arabic", "English", "Kind", "Date Added", "Language"]
+    return ["Spelling", "English", "Kind", "Date Added", "Language"]
 
 
 def words_csv(items: list[dict], language: str | None = None) -> str:
@@ -501,15 +529,15 @@ def words_csv(items: list[dict], language: str | None = None) -> str:
     writer.writerow(export_headers(learning))
     label = learning_label(learning)
     for item in sorted(items, key=_export_sort_key):
-        writer.writerow(
-            [
-                item.get("spelling") or "",
-                item.get("gloss") or "",
-                item.get("kind") or "",
-                item.get("learned_on") or "",
-                label,
-            ]
-        )
+        spelling = item.get("spelling") or ""
+        gloss = item.get("gloss") or ""
+        kind = item.get("kind") or ""
+        learned = item.get("learned_on") or ""
+        if learning == "arabic":
+            row = [spelling, item.get("arabic_script") or "", gloss, kind, learned, label]
+        else:
+            row = [spelling, gloss, kind, learned, label]
+        writer.writerow(row)
     return "\ufeff" + buffer.getvalue()
 
 
@@ -546,15 +574,21 @@ def update_item(
     gloss: str,
     embed=None,
     user_id: str = LOCAL_USER,
+    arabic_script: str | None = None,
 ) -> dict:
-    """Replace one saved spelling and gloss. A new gloss gets a new vector."""
+    """Replace one saved spelling and gloss. A new gloss gets a new vector.
+
+    Pass arabic_script to edit the Arabic column. The same text leaves the
+    source alone. A different text is marked user and later backfill skips it.
+    Omit arabic_script to leave the column as it is. Japanese rows ignore it.
+    """
     spelling = spelling.strip()
     gloss = gloss.strip()
     if not spelling or not gloss:
         raise ValueError("need a word and a meaning")
     current = conn.execute(
         """
-        SELECT i.id, i.gloss, l.language
+        SELECT i.id, i.gloss, i.arabic_script, i.arabic_source, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE i.id = ? AND l.user_id = ?
@@ -587,10 +621,18 @@ def update_item(
             vectors = None
         if vectors and len(vectors) == 1 and vectors[0]:
             vector = vectors[0]
+    script_sql = ""
+    script_params: tuple = ()
+    if arabic_script is not None and learning == "arabic":
+        new_script = " ".join(str(arabic_script).strip().split())
+        old_script = " ".join(str(current["arabic_script"] or "").split())
+        if new_script != old_script:
+            script_sql = ", arabic_script = ?, arabic_source = ?"
+            script_params = (new_script, "user")
     with conn:
         conn.execute(
-            "UPDATE lesson_items SET spelling = ?, gloss = ?, kind = ? WHERE id = ?",
-            (spelling, gloss, kind, item_id),
+            f"UPDATE lesson_items SET spelling = ?, gloss = ?, kind = ?{script_sql} WHERE id = ?",
+            (spelling, gloss, kind, *script_params, item_id),
         )
         if vector:
             conn.execute(
@@ -605,7 +647,8 @@ def update_item(
             )
     row = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, l.learned_on, l.id AS lesson_id, l.language
+        SELECT i.id, i.spelling, i.gloss, i.kind, i.arabic_script, i.arabic_source,
+               l.learned_on, l.id AS lesson_id, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE i.id = ? AND l.user_id = ?
@@ -631,7 +674,7 @@ def similar_items(conn, item_id: int, limit: int = 5, user_id: str = LOCAL_USER)
     learning = normalize_language(owned["language"])
     rows = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss, i.kind, e.vector
+        SELECT i.id, i.spelling, i.gloss, i.kind, i.arabic_script, i.arabic_source, e.vector
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         JOIN lesson_embeddings e ON e.item_id = i.id
@@ -648,6 +691,8 @@ def similar_items(conn, item_id: int, limit: int = 5, user_id: str = LOCAL_USER)
             "spelling": row["spelling"],
             "gloss": row["gloss"],
             "kind": row["kind"],
+            "arabic_script": row["arabic_script"],
+            "arabic_source": row["arabic_source"],
         }
         if row["id"] == item_id:
             target = vector

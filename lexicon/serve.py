@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from lexicon.arabic_script import fill_arabic_items
 from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
 from lexicon.cards import dispatch_get, dispatch_post, import_apkg
 from lexicon.db import LOCAL_USER, open_db
@@ -195,6 +196,19 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     ],
                 )
                 return
+            if path == "/api/items" and (body.get("action") or "").strip() == "fill-arabic":
+                conn = _db()
+                try:
+                    saved = fill_arabic_items(
+                        conn,
+                        user_id=LOCAL_USER,
+                        item_ids=body.get("ids"),
+                        limit=16,
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
+                return
             if path == "/api/lessons":
                 conn = _db()
                 try:
@@ -352,6 +366,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 body.get("spelling") or "",
                 body.get("gloss") or "",
                 user_id=LOCAL_USER,
+                arabic_script=body["arabic_script"] if "arabic_script" in body else None,
             )
         except (ValueError, LookupError) as exc:
             self._json(400, {"error": str(exc)})
