@@ -1684,6 +1684,11 @@
             <button id="words-dictionary-tab" class="secondary" type="button" role="tab" aria-selected="false" aria-controls="dictionary-panel">Dictionary</button>
             <button id="words-arabic-tab" class="secondary" type="button" role="tab" aria-selected="false" aria-controls="library">Arabic spelling</button>
           </div>
+          <div id="words-organise" class="learning-inline">
+            <label for="word-grouping">Group by</label>
+            <select id="word-grouping"><option value="lesson">Lesson date</option><option value="type">Word type</option></select>
+            <select id="word-type-filter" aria-label="Filter by word type" hidden><option value="">All types</option><option value="noun">Nouns</option><option value="adjective">Adjectives</option><option value="imperative">Imperatives / commands</option><option value="verb">Other verbs</option><option value="phrase">Phrases</option><option value="other">Other</option><option value="unsorted">Unsorted</option></select>
+          </div>
           <div id="arabic-spelling-tools" hidden>
             <p class="hint">Match your saved and CSV-imported words with <a href="https://www.arwords.com/" target="_blank" rel="noopener noreferrer">Arwords</a>. Matches use both Arabizi and meaning. Your edits are kept.</p>
             <button id="match-arwords" class="tint" type="button">Match my words</button>
@@ -3919,6 +3924,17 @@
     }
 
     let wordsWriting = "all";
+    let wordGrouping = localStorage.getItem("sawt-word-grouping") === "type" ? "type" : "lesson";
+    let wordTypeFilter = "";
+    document.querySelector("#word-grouping").value = wordGrouping;
+    document.querySelector("#word-type-filter").hidden = wordGrouping !== "type";
+    document.querySelector("#word-grouping").onchange = event => {
+      wordGrouping = event.target.value;
+      localStorage.setItem("sawt-word-grouping", wordGrouping);
+      document.querySelector("#word-type-filter").hidden = wordGrouping !== "type";
+      loadLibrary().catch(() => {});
+    };
+    document.querySelector("#word-type-filter").onchange = event => { wordTypeFilter = event.target.value; loadLibrary().catch(() => {}); };
     let matchingArwords = false;
 
     function syncWordsWriting() {
@@ -3926,6 +3942,7 @@
       if (!arabic && wordsWriting === "dictionary") wordsWriting = "all";
       const dictionary = wordsWriting === "dictionary";
       document.querySelector("#library").hidden = dictionary;
+      document.querySelector("#words-organise").hidden = dictionary;
       document.querySelector("#word-count").hidden = dictionary;
       document.querySelector("#dictionary-panel").hidden = !dictionary;
       document.querySelector("#words-dictionary-tab").setAttribute("aria-selected", dictionary ? "true" : "false");
@@ -3969,7 +3986,8 @@
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
-      const rows = Array.isArray(items) ? items : [];
+      let rows = Array.isArray(items) ? items : [];
+      if (wordGrouping === "type" && wordTypeFilter) rows = rows.filter(item => (window.SawtLearning?.wordClass(item.id) || "unsorted") === wordTypeFilter);
       if (rows.length === 0) {
         count.textContent = "";
         if (query && pending) {
@@ -3981,7 +3999,7 @@
         }
         const empty = document.createElement("p");
         empty.className = "empty";
-        empty.textContent = query ? "No words match that search." : t("emptyLibrary");
+        empty.textContent = wordGrouping === "type" && wordTypeFilter ? "No words in this type yet. Choose All types to assign word types." : query ? "No words match that search." : t("emptyLibrary");
         library.append(empty);
         if (!query) {
           const hint = document.createElement("p");
@@ -3992,6 +4010,16 @@
         return;
       }
       count.textContent = t("wordCount")(rows.length);
+      if (wordGrouping === "type") {
+        const labels = window.SawtLearning?.wordClassLabels() || {};
+        for (const [category, label] of [...Object.entries(labels), ["unsorted", "Unsorted"]]) {
+          const grouped = rows.filter(item => (window.SawtLearning?.wordClass(item.id) || "unsorted") === category);
+          if (!grouped.length) continue;
+          library.append(node("h3", "", label + " · " + grouped.length));
+          library.append(wordsTable(grouped));
+        }
+        return;
+      }
       if (query) {
         // Search stays in relevance order — do not regroup by lesson date.
         const heading = document.createElement("h3");
@@ -4203,6 +4231,7 @@
       const kind = document.createElement("td");
       kind.className = "kind";
       kind.textContent = item.kind;
+      if (wordGrouping === "type" && window.SawtLearning) kind.replaceChildren(window.SawtLearning.wordClassPicker(item));
       const editCell = document.createElement("td");
       editCell.className = "edit-cell";
       const forms = document.createElement("button");

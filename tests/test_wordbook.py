@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from lexicon.load import connect
 from lexicon.notebook import list_items, save_lesson
-from lexicon.wordbook import dictionary_entry, family, save_dictionary_word, save_family, search_dictionary, suggest_family
+from lexicon.wordbook import classify_word, word_classes, dictionary_entry, family, save_dictionary_word, save_family, search_dictionary, suggest_family
 
 
 ENTRY = {"id": 1, "arabic": "كتب", "meaning": "write", "url": "https://www.arwords.com/words/view/1", "forms": [{"arabic": "كتب", "translit": "katab", "conjugation": "perf.", "dialect": "Leb."}]}
@@ -47,6 +47,22 @@ class WordbookTests(unittest.TestCase):
         self.assertEqual(len(family(self.conn, "local", item_id)["forms"]), 1)
         with self.assertRaises(LookupError):
             family(self.conn, "other", item_id)
+
+    def test_optional_word_types_are_account_scoped_editable_and_clearable(self):
+        item_id = save_dictionary_word(self.conn, "local", {"entry_id": 1})["item_id"]
+        self.assertEqual(word_classes(self.conn, "local")["assignments"], {})
+        saved = classify_word(self.conn, "local", {"item_id": item_id, "category": "noun"})
+        self.assertEqual(saved["assignments"][str(item_id)], "noun")
+        changed = classify_word(self.conn, "local", {"item_id": item_id, "category": "imperative"})
+        self.assertEqual(changed["assignments"][str(item_id)], "imperative")
+        self.assertEqual(list_items(self.conn)[0]["kind"], "word")
+        self.assertEqual(word_classes(self.conn, "other")["assignments"], {})
+        with self.assertRaises(LookupError):
+            classify_word(self.conn, "other", {"item_id": item_id, "category": "adjective"})
+        with self.assertRaises(ValueError):
+            classify_word(self.conn, "local", {"item_id": item_id, "category": "invented"})
+        cleared = classify_word(self.conn, "local", {"item_id": item_id, "category": ""})
+        self.assertEqual(cleared["assignments"], {})
 
     def test_missing_forms_are_not_invented_on_network_failure(self):
         bare = {**ENTRY, "forms": []}

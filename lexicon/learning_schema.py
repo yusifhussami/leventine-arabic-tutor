@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS learning_families (
     revision INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
     UNIQUE(user_id,item_id)
 );
+CREATE TABLE IF NOT EXISTS learning_word_classes (
+    user_id TEXT NOT NULL, item_id BIGINT NOT NULL REFERENCES lesson_items(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK(category IN ('noun','adjective','imperative','verb','phrase','other')),
+    PRIMARY KEY(user_id,item_id)
+);
 CREATE TABLE IF NOT EXISTS learning_receipts (
     user_id TEXT NOT NULL, request_id TEXT NOT NULL, digest TEXT NOT NULL,
     result TEXT NOT NULL, PRIMARY KEY(user_id,request_id)

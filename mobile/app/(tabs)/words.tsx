@@ -1,3 +1,4 @@
+import WordTypePicker, { WORD_TYPE_CHOICES, type WordCategory, type WordClasses } from "@/src/learning/word-type-picker";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
@@ -16,6 +17,8 @@ export default function WordsScreen() {
   const { api, language, revision, touchLibrary } = useSession();
   const { patchWord } = usePractice();
   const [query, setQuery] = useState("");
+  const [byType, setByType] = useState(false);
+  const [classes, setClasses] = useState<WordClasses>({ labels: {}, assignments: {} });
   const [items, setItems] = useState<NotebookItem[]>([]);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
@@ -26,6 +29,8 @@ export default function WordsScreen() {
   const [matching, setMatching] = useState(false);
   const [matchStatus, setMatchStatus] = useState("");
   const request = useRef(0);
+  useEffect(() => { let current = true; api.json<WordClasses>("/api/items?action=word-classes").then(data => { if (current) setClasses(data); }).catch((err: unknown) => { if (current) setError(err instanceof Error ? err.message : "Could not load word types"); }); return () => { current = false; }; }, [api, language]);
+
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -46,7 +51,7 @@ export default function WordsScreen() {
   }, [api, query, language, revision]);
 
   const searching = query.trim().length > 0;
-  const groups = searching ? [] : groupByDate(items);
+  const groups = byType ? WORD_TYPE_CHOICES.filter(([category]) => category !== "").concat([["", "Unsorted"]]).map(([category, label]): [string, NotebookItem[]] => [label, items.filter(item => (classes.assignments[item.id] || "") === category)]).filter(([, rows]) => rows.length > 0) : searching ? [] : groupByDate(items);
 
   return (
     <Screen title={UI.tabWords}>
@@ -73,6 +78,8 @@ export default function WordsScreen() {
         />
       </View>
       <BodyScroll>
+        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}><Button label="By lesson date" kind={byType ? "secondary" : "tint"} onPress={() => setByType(false)} /><Button label="By word type" kind={byType ? "tint" : "secondary"} onPress={() => setByType(true)} /></View>
+        {byType ? <Hint>Assign a type to split nouns, adjectives, and imperatives. You can change it or return to lesson dates at any time.</Hint> : null}
         {language === "arabic" ? <Button label="Search the dictionary" kind="secondary" onPress={() => router.navigate({ pathname: "/learn", params: { view: "dictionary" } })} /> : null}
         {language === "arabic" ? (
           <View style={{ gap: 12 }}>
@@ -109,13 +116,16 @@ export default function WordsScreen() {
         ) : (
           <Text style={{ color: theme.secondary }}>{wordCount(items.length)}</Text>
         )}
-        {searching && items.length > 0 ? (
+        {searching && items.length > 0 && !byType ? (
           <View style={{ gap: 4 }}>
             <Text style={{ color: theme.secondary, fontWeight: "600" }}>{UI.searchResults}</Text>
             {items.map((item) => (
               <WordRow
                 key={item.id}
                 item={item}
+                organiseTypes={byType}
+                wordType={classes.assignments[item.id] || ""}
+                onTypeSaved={setClasses}
                 editing={editing === item.id}
                 spelling={spelling}
                 gloss={gloss}
@@ -148,11 +158,14 @@ export default function WordsScreen() {
         ) : null}
         {groups.map(([date, rows]) => (
           <View key={date} style={{ gap: 4 }}>
-            <Text style={{ color: theme.secondary, fontWeight: "600", marginTop: 8 }}>{formatDay(date)}</Text>
+            <Text style={{ color: theme.secondary, fontWeight: "600", marginTop: 8 }}>{byType ? date : formatDay(date)}</Text>
             {rows.map((item) => (
               <WordRow
                 key={item.id}
                 item={item}
+                organiseTypes={byType}
+                wordType={classes.assignments[item.id] || ""}
+                onTypeSaved={setClasses}
                 editing={editing === item.id}
                 spelling={spelling}
                 gloss={gloss}
@@ -190,6 +203,9 @@ export default function WordsScreen() {
 
 function WordRow({
   item,
+  organiseTypes,
+  wordType,
+  onTypeSaved,
   editing,
   spelling,
   gloss,
@@ -204,6 +220,9 @@ function WordRow({
   onSave,
 }: {
   item: NotebookItem;
+  organiseTypes: boolean;
+  wordType: WordCategory;
+  onTypeSaved: (data: WordClasses) => void;
   editing: boolean;
   spelling: string;
   gloss: string;
@@ -254,6 +273,7 @@ function WordRow({
         <Text style={{ fontFamily: theme.reading, fontSize: 20, color: theme.label, writingDirection: arabicFirst ? "rtl" : "auto", textAlign: arabicFirst ? "right" : "auto" }}>{arabicFirst ? item.arabic_script || "—" : item.spelling}</Text>
         {arabicFirst ? <Text style={{ color: theme.secondary }}>{item.spelling} · {item.arabic_source === "arwords" ? "Arwords" : item.arabic_source === "user" ? "Your edit" : item.arabic_source === "ai" ? "AI suggestion — review" : item.arabic_source === "dictionary" ? "Wiktionary" : "No spelling yet"}</Text> : null}
         <Text style={{ color: theme.secondary, marginTop: 2 }}>{item.gloss}</Text>
+        {organiseTypes ? <WordTypePicker itemId={item.id} category={wordType} onSaved={onTypeSaved} /> : null}
       </View>
       <Text style={{ color: theme.secondary, fontSize: 12 }}>{item.kind}</Text>
       {language === "arabic" ? <Pressable onPress={onForms} hitSlop={8}><Text style={{ color: theme.blueText }}>Forms</Text></Pressable> : null}

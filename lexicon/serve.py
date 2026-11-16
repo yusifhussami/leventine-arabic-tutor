@@ -104,7 +104,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
         if path in {"/api/items", "/api/lessons"}:
             query = parse_qs(urlparse(self.path).query)
             action = query.get("action", [""])[0]
-            if path == "/api/lessons" or action in {"dictionary", "dictionary-entry", "family"}:
+            if path == "/api/lessons" or action in {"dictionary", "dictionary-entry", "family", "word-classes"}:
                 conn = _db()
                 try:
                     result = learning.dispatch_get(conn, LOCAL_USER, action, query.get("id", [""])[0]) if path == "/api/lessons" else wordbook.dispatch_get(conn, LOCAL_USER, action, query.get("q", [""])[0], query.get("id", [""])[0])
@@ -241,7 +241,7 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     conn.close()
                 self._json(200, result)
                 return
-            if path == "/api/items" and body.get("action") in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family"}:
+            if path == "/api/items" and body.get("action") in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family", "classify-word"}:
                 conn = _db()
                 try:
                     result = wordbook.dispatch_post(conn, LOCAL_USER, body)

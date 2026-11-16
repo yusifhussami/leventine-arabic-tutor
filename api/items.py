@@ -21,7 +21,7 @@ class handler(BaseHTTPRequestHandler):
         def run():
             user_id = require_user(self)
             action = query_param(self, "action")
-            if action in {"dictionary", "dictionary-entry", "family"}:
+            if action in {"dictionary", "dictionary-entry", "family", "word-classes"}:
                 json_response(self, 200, with_db(lambda conn: wordbook.dispatch_get(conn, user_id, action, query_param(self, "q"), query_param(self, "id"))))
                 return
             query = query_param(self, "q")
@@ -61,7 +61,7 @@ class handler(BaseHTTPRequestHandler):
             user_id = require_user(self)
             body = read_json(self)
             action = (body.get("action") or "").strip()
-            if action in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family"}:
+            if action in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family", "classify-word"}:
                 json_response(self, 200, with_db(lambda conn: wordbook.dispatch_post(conn, user_id, body)))
                 return
             if action not in {"fill-arabic", "match-arwords"}:

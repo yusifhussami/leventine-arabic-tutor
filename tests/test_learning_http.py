@@ -61,6 +61,10 @@ class LearningHTTPTests(unittest.TestCase):
             detail = self.request(server.server_port, '/api/lessons?action=task&id='+str(task['id']))
             self.assertEqual(detail['attempts'][0]['text'], 'My own sentence')
             self.assertEqual(detail['attempts'][0]['corrections'][0]['text'], 'Teacher correction')
+            word_id = task['words'][0]['id']
+            categories = self.request(server.server_port, '/api/items', {'action':'classify-word','item_id':word_id,'category':'adjective'})
+            self.assertEqual(categories['assignments'][str(word_id)], 'adjective')
+            self.assertEqual(self.request(server.server_port, '/api/items?action=word-classes')['assignments'][str(word_id)], 'adjective')
             found = self.request(server.server_port, '/api/items?action=dictionary&q=coffee')
             self.assertGreater(found['total'], 0)
         finally:

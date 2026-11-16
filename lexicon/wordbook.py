@@ -16,6 +16,26 @@ from lexicon.prefs import get_language
 
 FORM_KINDS = ("noun", "verbal_noun", "adjective", "past", "imperfect", "present", "imperative", "continuous", "active_participle", "passive_participle", "other")
 FORM_SOURCES = ("teacher", "dictionary", "learner", "suggestion")
+WORD_CLASSES = {"noun": "Nouns", "adjective": "Adjectives", "imperative": "Imperatives / commands", "verb": "Other verbs", "phrase": "Phrases", "other": "Other"}
+
+
+def word_classes(conn, user_id):
+    rows = conn.execute("SELECT c.item_id,c.category FROM learning_word_classes c JOIN lesson_items i ON i.id=c.item_id JOIN lessons l ON l.id=i.lesson_id WHERE c.user_id = ? AND l.user_id = ? AND l.language = ?", (user_id, user_id, get_language(conn, user_id))).fetchall()
+    return {"labels": WORD_CLASSES, "assignments": {str(row["item_id"]): row["category"] for row in rows}}
+
+
+def classify_word(conn, user_id, body):
+    item = _item(conn, user_id, body.get("item_id"))
+    category = body.get("category", "")
+    if not isinstance(category, str) or (category and category not in WORD_CLASSES):
+        raise ValueError("Choose noun, adjective, imperative, verb, phrase, other, or unsorted")
+    with conn:
+        if category:
+            conn.execute("INSERT INTO learning_word_classes(user_id,item_id,category) VALUES (?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET category=excluded.category", (user_id, item["id"], category))
+        else:
+            conn.execute("DELETE FROM learning_word_classes WHERE user_id = ? AND item_id = ?", (user_id, item["id"]))
+    return word_classes(conn, user_id)
+
 
 
 def _fold(value):
@@ -187,6 +207,8 @@ def save_dictionary_word(conn, user_id, body):
 
 
 def dispatch_get(conn, user_id, action, query="", record_id=""):
+    if action == "word-classes":
+        return word_classes(conn, user_id)
     if action == "dictionary":
         return search_dictionary(query)
     if action == "dictionary-entry":
@@ -198,6 +220,8 @@ def dispatch_get(conn, user_id, action, query="", record_id=""):
 
 def dispatch_post(conn, user_id, body):
     action = body.get("action")
+    if action == "classify-word":
+        return classify_word(conn, user_id, body)
     if action == "save-dictionary":
         return save_dictionary_word(conn, user_id, body)
     if action == "save-family":

@@ -9,6 +9,7 @@
     recap: null,
     family: null,
     words: [],
+    wordClasses: { labels: {}, assignments: {} },
     view: "list",
     session: null,
     dirty: false,
@@ -131,6 +132,7 @@
   function reset() {
     state.workspace = null;
     state.words = [];
+    state.wordClasses = { labels: {}, assignments: {} };
     state.task = null;
     state.recap = null;
     state.family = null;
@@ -156,6 +158,8 @@
       const data = await api("/api/lessons?action=workspace");
       if (seq !== state.seq || key !== identity()) return;
       state.workspace = data;
+      state.wordClasses = await api("/api/items?action=word-classes");
+      if (wordGrouping === "type") loadLibrary().catch(() => {});
       renderHome();
       if (state.view === "list") renderLessons();
       if (!state.recap) renderKnowledge();
@@ -1313,7 +1317,44 @@
       event.returnValue = "";
     }
   });
+  function wordClassPicker(item) {
+    const select = el("select");
+    select.setAttribute("aria-label", "Word type for " + item.spelling);
+    for (const [value, label] of [
+      ["", "Unsorted"],
+      ...Object.entries(state.wordClasses?.labels || {}),
+    ]) {
+      const option = el("option", "", label);
+      option.value = value;
+      select.append(option);
+    }
+    select.value = state.wordClasses?.assignments?.[item.id] || "";
+    select.onchange = async () => {
+      const previous = state.wordClasses?.assignments?.[item.id] || "";
+      select.disabled = true;
+      try {
+        state.wordClasses = await post("/api/items", {
+          action: "classify-word",
+          item_id: item.id,
+          category: select.value,
+        });
+        await loadLibrary();
+        say(
+          "Word type saved. You can change it or return it to Unsorted at any time.",
+        );
+      } catch (error) {
+        select.value = previous;
+        fail(error);
+      } finally {
+        select.disabled = false;
+      }
+    };
+    return select;
+  }
   window.SawtLearning = {
+    wordClass: (id) => state.wordClasses?.assignments?.[id] || "",
+    wordClassLabels: () => state.wordClasses?.labels || {},
+    wordClassPicker,
     refresh,
     openFamily,
     openDictionary,
