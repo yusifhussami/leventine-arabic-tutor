@@ -223,6 +223,10 @@ CREATE TABLE IF NOT EXISTS script_cache (
 """
 
 
+from lexicon.learning_schema import learning_schema
+
+SCHEMA += learning_schema("sqlite")
+
 def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open a database and enforce foreign keys on this connection.
 

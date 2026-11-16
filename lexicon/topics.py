@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from lexicon.db import LOCAL_USER, insert_id
 from lexicon.judge import MODEL, RateLimiter, _json_body, complete, message_text
 from lexicon.load import normalize_meaning, normalize_word
-from lexicon.notebook import drop_exact_duplicates, list_items
+from lexicon.notebook import list_items
 from lexicon.prefs import (
     get_language,
     learning_label,
@@ -266,11 +266,11 @@ def build_topic_prompt(
         )
     else:
         who = (
-            "The learner is Yusif. The teacher is Amer. "
+            "The learner is studying with their current teacher. "
             "They speak Levantine Arabic in lessons.\n"
             "Propose one primary topic and 2 or 3 alternates they can talk about next lesson.\n"
             "Titles and why-sentences are English.\n"
-            "Starter prompts are short questions Amer or Yusif could say, "
+            "Starter prompts are short questions the teacher or learner could say, "
             "in Levantine Arabizi (lowercase, digit letters: "
             "2 for ء/أ, 3 for ع, 5 for خ, 6 for ط, 7 for ح, 8 for ق, 9 for ص). "
             "Not MSA textbook Arabic. Not Japanese.\n"
@@ -657,7 +657,6 @@ def generate_topics(
     if pace is None:
         pace = _TOPIC_PACE
     learning = normalize_language(language or get_language(conn, user_id))
-    drop_exact_duplicates(conn, user_id=user_id, language=learning)
     library = list_items(conn, user_id=user_id, language=learning)
     unique = _unique_items(library)
     if len(unique) < MIN_SAVED_WORDS:

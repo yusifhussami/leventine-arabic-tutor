@@ -93,8 +93,9 @@ class TopicPromptTests(unittest.TestCase):
         self.assertIn("wa7shni = I miss him", prompt)
         self.assertIn("shoghol = work", prompt)
         self.assertIn("LANGUAGE LOCK: arabic", prompt)
-        self.assertIn("Yusif", prompt)
-        self.assertIn("Amer", prompt)
+        self.assertIn("current teacher", prompt)
+        self.assertNotIn("Amer", prompt)
+        self.assertNotIn("Yusif", prompt)
         self.assertIn("Levantine Arabizi", prompt)
         self.assertIn("FORBIDDEN SCENES", prompt)
         for label in (

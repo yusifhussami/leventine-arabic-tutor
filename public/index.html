@@ -1483,6 +1483,7 @@
       .card-show-key, .grade-key { display: none; }
     }
   </style>
+  <link rel="stylesheet" href="/learning.css">
 </head>
 <body>
   <div id="auth-gate" class="auth-gate" hidden>
@@ -1501,6 +1502,8 @@
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M8 3.5v3M16 3.5v3M4 10h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           <span data-i18n="tabToday">Today</span>
         </button>
+        <button class="tab" type="button" data-tab="lessons"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" stroke-width="1.7"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="1.7"/></svg><span>Lessons</span></button>
+        <button class="tab" type="button" data-tab="knowledge"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 15c-4-4-1-11 4-11s8 7 4 11l-2 2h-4l-2-2ZM10 21h4M10 18h4" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Knowledge</span></button>
         <button class="tab" type="button" data-tab="words">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h6.2A2.8 2.8 0 0 1 14 8.3V19a2.2 2.2 0 0 0-2.2-2.2H5V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M19 5.5h-6.2A2.8 2.8 0 0 0 10 8.3V19a2.2 2.2 0 0 1 2.2-2.2H19V5.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
           <span data-i18n="tabWords">Words</span>
@@ -1540,6 +1543,8 @@
       </header>
       <div class="panes">
         <div id="pane-today" class="pane">
+          <section id="learning-home" class="learning-home" aria-label="Learning overview"></section>
+          <details class="learning-details"><summary>Quick word capture and CSV import</summary>
           <div class="document">
             <h2 data-i18n="addLesson">Add a lesson</h2>
             <p class="hint" data-i18n="lessonHint">Each Arabizi spelling stays with its English meaning.</p>
@@ -1604,6 +1609,7 @@
             <p id="today-search-status" class="hint" aria-live="polite"></p>
             <ul id="today-search-results" class="today-results"></ul>
           </div>
+          </details>
         </div>
 
         <div id="pane-practice" class="pane" hidden>
@@ -1651,7 +1657,7 @@
             <div class="topics-head">
               <div>
                 <h2 data-i18n="tabTopics">Topics</h2>
-                <p class="hint" data-i18n="topicsHint">A situation you and Amer can talk about next lesson, using words you already saved.</p>
+                <p class="hint" data-i18n="topicsHint">A situation you and your teacher can talk about next lesson, using words you already saved.</p>
               </div>
               <button id="topics-generate" class="primary" type="button" data-i18n="topicsGenerate">Generate a topic</button>
             </div>
@@ -1666,6 +1672,8 @@
           </div>
         </div>
 
+        <div id="pane-lessons" class="pane" hidden><section id="learning-lessons" class="learning-page"></section></div>
+        <div id="pane-knowledge" class="pane" hidden><section id="learning-knowledge" class="learning-page"></section></div>
         <div id="pane-words" class="pane" hidden>
           <div class="words-bar">
             <p id="word-count" class="count"></p>
@@ -1673,7 +1681,13 @@
           </div>
           <div id="words-writing-tabs" class="row" role="tablist" aria-label="Word display">
             <button id="words-all-tab" class="secondary" type="button" role="tab" aria-selected="true" aria-controls="library">All words</button>
+            <button id="words-dictionary-tab" class="secondary" type="button" role="tab" aria-selected="false" aria-controls="dictionary-panel">Dictionary</button>
             <button id="words-arabic-tab" class="secondary" type="button" role="tab" aria-selected="false" aria-controls="library">Arabic spelling</button>
+          </div>
+          <div id="words-organise" class="learning-inline">
+            <label for="word-grouping">Group by</label>
+            <select id="word-grouping"><option value="lesson">Lesson date</option><option value="type">Word type</option></select>
+            <select id="word-type-filter" aria-label="Filter by word type" hidden><option value="">All types</option><option value="noun">Nouns</option><option value="adjective">Adjectives</option><option value="imperative">Imperatives / commands</option><option value="verb">Other verbs</option><option value="phrase">Phrases</option><option value="other">Other</option><option value="unsorted">Unsorted</option></select>
           </div>
           <div id="arabic-spelling-tools" hidden>
             <p class="hint">Match your saved and CSV-imported words with <a href="https://www.arwords.com/" target="_blank" rel="noopener noreferrer">Arwords</a>. Matches use both Arabizi and meaning. Your edits are kept.</p>
@@ -1681,6 +1695,8 @@
             <p id="arwords-status" class="hint" role="status"></p>
           </div>
           <p id="library-error" class="error"></p>
+          <section id="dictionary-panel" hidden aria-label="Dictionary search"></section>
+          <section id="word-family-panel" hidden aria-label="Word family"></section>
           <div id="library"></div>
         </div>
 
@@ -1902,7 +1918,7 @@
         arabiziAria: "Arabizi",
         speakMissing: "No Arabic script to speak. Type a line, or try again.",
         micLang: "ar-SA",
-        topicsHint: "A situation you and Amer can talk about next lesson, using words you already saved.",
+        topicsHint: "A situation you and your teacher can talk about next lesson, using words you already saved.",
       },
       japanese: {
         lessonHint: "Each kana (or romaji) spelling stays with its English meaning.",
@@ -2059,6 +2075,8 @@
       const activeTab = document.querySelector(".tab.active")?.dataset.tab || "today";
       const titleKeys = {
         today: "tabToday",
+        lessons: "Lessons",
+        knowledge: "Knowledge",
         practice: "tabPractice",
         topics: "tabTopics",
         words: "tabWords",
@@ -2239,9 +2257,11 @@
     };
 
     function showTab(name) {
-      if (!["today", "words", "cards", "settings"].includes(name)) return;
+      if (!["today", "lessons", "knowledge", "words", "cards", "settings"].includes(name)) return;
       const titleKeys = {
         today: "tabToday",
+        lessons: "Lessons",
+        knowledge: "Knowledge",
         practice: "tabPractice",
         topics: "tabTopics",
         words: "tabWords",
@@ -2255,7 +2275,7 @@
         clearCardWait();
         stopCardClock();
       }
-      for (const tab of ["today", "practice", "topics", "words", "cards", "checklist", "settings"]) {
+      for (const tab of ["today", "lessons", "knowledge", "practice", "topics", "words", "cards", "checklist", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -2266,6 +2286,7 @@
         }
       }
       if (name === "cards" && cardsMode === "home") loadCardDecks();
+      window.SawtLearning?.show(name);
     }
 
     function topicWords(topic) {
@@ -3903,11 +3924,31 @@
     }
 
     let wordsWriting = "all";
+    let wordGrouping = localStorage.getItem("sawt-word-grouping") === "type" ? "type" : "lesson";
+    let wordTypeFilter = "";
+    document.querySelector("#word-grouping").value = wordGrouping;
+    document.querySelector("#word-type-filter").hidden = wordGrouping !== "type";
+    document.querySelector("#word-grouping").onchange = event => {
+      wordGrouping = event.target.value;
+      localStorage.setItem("sawt-word-grouping", wordGrouping);
+      document.querySelector("#word-type-filter").hidden = wordGrouping !== "type";
+      loadLibrary().catch(() => {});
+    };
+    document.querySelector("#word-type-filter").onchange = event => { wordTypeFilter = event.target.value; loadLibrary().catch(() => {}); };
     let matchingArwords = false;
 
     function syncWordsWriting() {
       const arabic = learningLanguage === "arabic";
-      document.querySelector("#words-writing-tabs").hidden = !arabic;
+      if (!arabic && wordsWriting === "dictionary") wordsWriting = "all";
+      const dictionary = wordsWriting === "dictionary";
+      document.querySelector("#library").hidden = dictionary;
+      document.querySelector("#words-organise").hidden = dictionary;
+      document.querySelector("#word-count").hidden = dictionary;
+      document.querySelector("#dictionary-panel").hidden = !dictionary;
+      document.querySelector("#words-dictionary-tab").setAttribute("aria-selected", dictionary ? "true" : "false");
+      document.querySelector("#words-writing-tabs").hidden = false;
+      document.querySelector("#words-arabic-tab").hidden = !arabic;
+      document.querySelector("#words-dictionary-tab").hidden = !arabic;
       document.querySelector("#arabic-spelling-tools").hidden = !arabic || wordsWriting !== "arabic";
       document.querySelector("#words-all-tab").setAttribute("aria-selected", wordsWriting === "all" ? "true" : "false");
       document.querySelector("#words-arabic-tab").setAttribute("aria-selected", wordsWriting === "arabic" ? "true" : "false");
@@ -3945,7 +3986,8 @@
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
-      const rows = Array.isArray(items) ? items : [];
+      let rows = Array.isArray(items) ? items : [];
+      if (wordGrouping === "type" && wordTypeFilter) rows = rows.filter(item => (window.SawtLearning?.wordClass(item.id) || "unsorted") === wordTypeFilter);
       if (rows.length === 0) {
         count.textContent = "";
         if (query && pending) {
@@ -3957,7 +3999,7 @@
         }
         const empty = document.createElement("p");
         empty.className = "empty";
-        empty.textContent = query ? "No words match that search." : t("emptyLibrary");
+        empty.textContent = wordGrouping === "type" && wordTypeFilter ? "No words in this type yet. Choose All types to assign word types." : query ? "No words match that search." : t("emptyLibrary");
         library.append(empty);
         if (!query) {
           const hint = document.createElement("p");
@@ -3968,6 +4010,16 @@
         return;
       }
       count.textContent = t("wordCount")(rows.length);
+      if (wordGrouping === "type") {
+        const labels = window.SawtLearning?.wordClassLabels() || {};
+        for (const [category, label] of [...Object.entries(labels), ["unsorted", "Unsorted"]]) {
+          const grouped = rows.filter(item => (window.SawtLearning?.wordClass(item.id) || "unsorted") === category);
+          if (!grouped.length) continue;
+          library.append(node("h3", "", label + " · " + grouped.length));
+          library.append(wordsTable(grouped));
+        }
+        return;
+      }
       if (query) {
         // Search stays in relevance order — do not regroup by lesson date.
         const heading = document.createElement("h3");
@@ -4179,8 +4231,15 @@
       const kind = document.createElement("td");
       kind.className = "kind";
       kind.textContent = item.kind;
+      if (wordGrouping === "type" && window.SawtLearning) kind.replaceChildren(window.SawtLearning.wordClassPicker(item));
       const editCell = document.createElement("td");
       editCell.className = "edit-cell";
+      const forms = document.createElement("button");
+      forms.type = "button";
+      forms.className = "text";
+      forms.textContent = "Forms";
+      forms.onclick = () => window.SawtLearning?.openFamily(item.id);
+      if (learningLanguage === "arabic") editCell.append(forms);
       const edit = document.createElement("button");
       edit.className = "text";
       edit.type = "button";
@@ -4919,6 +4978,7 @@
         loadNextLesson();
         loadLibrary();
         loadRecent();
+        window.SawtLearning?.refresh().catch(() => {});
       });
     }).catch((err) => {
       document.querySelector("#auth-gate").hidden = false;
@@ -4926,5 +4986,6 @@
       document.querySelector("#auth-gate p").textContent = err.message || "Could not start sign-in.";
     });
   </script>
+  <script src="/learning.js"></script>
 </body>
 </html>

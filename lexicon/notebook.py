@@ -67,37 +67,6 @@ def _known_pairs(
     return {(normalize_word(row["spelling"]), normalize_meaning(row["gloss"])) for row in rows}
 
 
-def drop_exact_duplicates(
-    conn, user_id: str = LOCAL_USER, language: str | None = None
-) -> int:
-    """Keep the newest copy of a spelling with the same meaning. Other glosses stay."""
-    learning = _learning(conn, user_id, language)
-    rows = conn.execute(
-        """
-        SELECT i.id, i.spelling, i.gloss
-        FROM lesson_items i
-        JOIN lessons l ON l.id = i.lesson_id
-        WHERE l.user_id = ? AND l.language = ?
-        ORDER BY l.learned_on DESC, l.id DESC, i.id DESC
-        """,
-        (user_id, learning),
-    ).fetchall()
-    seen: set[tuple[str, str]] = set()
-    remove: list[int] = []
-    for row in rows:
-        key = (normalize_word(row["spelling"]), normalize_meaning(row["gloss"]))
-        if not key[0]:
-            continue
-        if key in seen:
-            remove.append(row["id"])
-        else:
-            seen.add(key)
-    if remove:
-        with conn:
-            conn.executemany("DELETE FROM lesson_items WHERE id = ?", [(item_id,) for item_id in remove])
-    return len(remove)
-
-
 def save_lesson(
     conn,
     learned_on: str,
@@ -912,7 +881,6 @@ def talk(
     """
     history = _talk_turns(turns)
     learning = _learning(conn, user_id, language)
-    drop_exact_duplicates(conn, user_id=user_id, language=learning)
     latin = writing_system_label(learning)
     script = speech_script_label(learning)
     target_name = learning_label(learning)

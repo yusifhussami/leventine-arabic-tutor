@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/theme";
 
 export const unstable_settings = {
-  initialRouteName: "index",
+  initialRouteName: "learn",
 };
 
 export default function TabLayout() {
@@ -24,6 +24,10 @@ export default function TabLayout() {
         },
       }}
     >
+      <NativeTabs.Trigger name="learn" disableAutomaticContentInsets>
+        <NativeTabs.Trigger.Icon sf="pencil.and.outline" md="edit_note" />
+        <NativeTabs.Trigger.Label>Learn</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Icon sf="calendar" md="calendar_today" />
         <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>

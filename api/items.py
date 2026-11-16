@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 
 from lexicon.arabic_script import fill_arabic_items
 from lexicon.arwords import match_notebook
+from lexicon import wordbook
 from lexicon.http_api import (
     file_response,
     handle_errors,
@@ -11,7 +12,7 @@ from lexicon.http_api import (
     require_user,
     with_db,
 )
-from lexicon.notebook import drop_exact_duplicates, export_words_csv, list_items, search_items
+from lexicon.notebook import export_words_csv, list_items, search_items
 from lexicon.prefs import get_language
 
 
@@ -19,13 +20,16 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         def run():
             user_id = require_user(self)
+            action = query_param(self, "action")
+            if action in {"dictionary", "dictionary-entry", "family", "word-classes"}:
+                json_response(self, 200, with_db(lambda conn: wordbook.dispatch_get(conn, user_id, action, query_param(self, "q"), query_param(self, "id"))))
+                return
             query = query_param(self, "q")
             # Same function as the word list. Hobby allows 12 files under api/.
             export_format = query_param(self, "format").strip().lower()
 
             def work(conn):
                 language = get_language(conn, user_id)
-                drop_exact_duplicates(conn, user_id, language=language)
                 if export_format == "csv":
                     filename, text = export_words_csv(
                         conn, user_id=user_id, language=language
@@ -57,6 +61,9 @@ class handler(BaseHTTPRequestHandler):
             user_id = require_user(self)
             body = read_json(self)
             action = (body.get("action") or "").strip()
+            if action in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family", "classify-word"}:
+                json_response(self, 200, with_db(lambda conn: wordbook.dispatch_post(conn, user_id, body)))
+                return
             if action not in {"fill-arabic", "match-arwords"}:
                 json_response(self, 404, {"error": "not found"})
                 return

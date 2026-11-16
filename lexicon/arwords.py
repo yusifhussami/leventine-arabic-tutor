@@ -81,7 +81,7 @@ class FormsParser(HTMLParser):
         if tag == "tr":
             self.row = {}
         if self.row is not None:
-            field = {"ar_word_form": "arabic", "chat_view": "translit", "form_dialect": "dialect"}.get(attrs.get("class"))
+            field = {"ar_word_form": "arabic", "chat_view": "translit", "form_dialect": "dialect", "form_conj": "conjugation"}.get(attrs.get("class"))
             if field:
                 self.field = field
                 self.row[field] = ""
