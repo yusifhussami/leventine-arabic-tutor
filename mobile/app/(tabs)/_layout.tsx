@@ -28,18 +28,12 @@ export default function TabLayout() {
         <NativeTabs.Trigger.Icon sf="calendar" md="calendar_today" />
         <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="practice" disableAutomaticContentInsets>
-        <NativeTabs.Trigger.Icon sf="waveform" md="graphic_eq" />
-        <NativeTabs.Trigger.Label>Practice</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="practice" hidden />
       <NativeTabs.Trigger name="words" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Icon sf="book" md="menu_book" />
         <NativeTabs.Trigger.Label>Words</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="checklist" disableAutomaticContentInsets>
-        <NativeTabs.Trigger.Icon sf="checklist" md="checklist" />
-        <NativeTabs.Trigger.Label>Checklist</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="checklist" hidden />
       <NativeTabs.Trigger name="settings" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Icon sf="gearshape" md="settings" />
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>

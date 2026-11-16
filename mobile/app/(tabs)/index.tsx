@@ -9,7 +9,6 @@ import { importCsv, loadItems, loadNextLesson, previewLesson, saveCalendar, save
 import { BodyScroll, Button, ErrorText, Field, Hint, Screen } from "@/src/components/ui";
 import { UI, copy, importDone } from "@/src/copy";
 import { formatDay, formatLesson, isoDay, recentLessons } from "@/src/logic";
-import { usePractice } from "@/src/practice";
 import { useSession } from "@/src/session";
 import { useTheme } from "@/src/theme";
 import type { NotebookItem, PreviewItem } from "@/src/types";
@@ -17,7 +16,6 @@ import type { NotebookItem, PreviewItem } from "@/src/types";
 export default function TodayScreen() {
   const theme = useTheme();
   const { api, language, touchLibrary } = useSession();
-  const { openWord } = usePractice();
   const [day, setDay] = useState(() => new Date());
   const [showDate, setShowDate] = useState(false);
   const [text, setText] = useState("");
@@ -68,11 +66,6 @@ export default function TodayScreen() {
     refreshLesson().catch(() => setLesson(UI.calendarReadError));
     refreshRecent().catch(() => setRecent([]));
   }, [refreshLesson, refreshRecent, language]);
-
-  const openSavedWord = (item: NotebookItem) => {
-    openWord(item);
-    router.navigate("/practice");
-  };
 
   return (
     <Screen title={UI.tabToday}>
@@ -184,13 +177,13 @@ export default function TodayScreen() {
               <View key={rows[0].lesson_id} style={{ gap: 4 }}>
                 <Text style={{ color: theme.secondary, fontWeight: "600", fontSize: 13 }}>{formatDay(rows[0].learned_on)}</Text>
                 {rows.map((item) => (
-                  <Pressable key={item.id} onPress={() => openSavedWord(item)} style={{ paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View key={item.id} style={{ paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontFamily: theme.reading, fontSize: 18, color: theme.label }}>{item.spelling}</Text>
                       <Text style={{ color: theme.secondary }}>{item.gloss}</Text>
                     </View>
                     <Text style={{ color: theme.secondary, fontSize: 12 }}>{item.kind}</Text>
-                  </Pressable>
+                  </View>
                 ))}
               </View>
             ))}

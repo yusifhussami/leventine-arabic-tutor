@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -14,7 +13,7 @@ import type { NotebookItem } from "@/src/types";
 export default function WordsScreen() {
   const theme = useTheme();
   const { api, language, revision, touchLibrary } = useSession();
-  const { openWord, patchWord } = usePractice();
+  const { patchWord } = usePractice();
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<NotebookItem[]>([]);
   const [error, setError] = useState("");
@@ -43,11 +42,6 @@ export default function WordsScreen() {
 
   const searching = query.trim().length > 0;
   const groups = searching ? [] : groupByDate(items);
-
-  const practiceWord = (item: NotebookItem) => {
-    openWord(item);
-    router.navigate("/practice");
-  };
 
   return (
     <Screen title={UI.tabWords}>
@@ -95,7 +89,6 @@ export default function WordsScreen() {
                 gloss={gloss}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
-                onOpen={() => practiceWord(item)}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
@@ -128,7 +121,6 @@ export default function WordsScreen() {
                 gloss={gloss}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
-                onOpen={() => practiceWord(item)}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
@@ -161,7 +153,6 @@ function WordRow({
   gloss,
   onSpelling,
   onGloss,
-  onOpen,
   onEdit,
   onCancel,
   onSave,
@@ -172,7 +163,6 @@ function WordRow({
   gloss: string;
   onSpelling: (value: string) => void;
   onGloss: (value: string) => void;
-  onOpen: () => void;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -209,10 +199,10 @@ function WordRow({
   }
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.separator }}>
-      <Pressable onPress={onOpen} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <Text style={{ fontFamily: theme.reading, fontSize: 20, color: theme.label }}>{item.spelling}</Text>
         <Text style={{ color: theme.secondary, marginTop: 2 }}>{item.gloss}</Text>
-      </Pressable>
+      </View>
       <Text style={{ color: theme.secondary, fontSize: 12 }}>{item.kind}</Text>
       <Pressable onPress={onEdit} hitSlop={8}>
         <Text style={{ color: theme.blueText, fontWeight: "600" }}>{UI.edit}</Text>
