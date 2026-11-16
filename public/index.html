@@ -4831,10 +4831,9 @@
         document.querySelector("#quick-search").focus();
         return;
       }
-      clearTimeout(searchTimer);
       searchField.value = query;
       showTab("words");
-      loadLibrary().catch(() => {});
+      runLibrarySearchNow();
       searchField.focus();
     });
     searchField.addEventListener("input", scheduleLibrarySearch);
