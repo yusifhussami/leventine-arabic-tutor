@@ -231,6 +231,28 @@
       color: var(--label);
     }
     .summary { display: block; margin: 8px 0 0; color: var(--secondary); font-size: 13px; }
+    .quick-search {
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid var(--separator);
+    }
+    .quick-search form {
+      display: flex;
+      gap: 6px;
+    }
+    .quick-search input {
+      min-width: 0;
+      min-height: 30px;
+    }
+    .quick-search button {
+      flex: 0 0 30px;
+      width: 30px;
+      min-height: 30px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+    }
+    .quick-search button svg { width: 14px; height: 14px; }
     label {
       display: block;
       margin-bottom: 4px;
@@ -1347,6 +1369,18 @@
           <aside class="inspector">
             <p class="kicker" data-i18n="nextLesson">Next lesson</p>
             <p id="next-lesson" class="lead" data-i18n="lookingUpLesson">Looking up your next Arabic lesson.</p>
+            <section class="quick-search" aria-labelledby="quick-search-label">
+              <p id="quick-search-label" class="kicker" data-i18n="quickSearch">Quick search</p>
+              <form id="quick-search-form" role="search">
+                <input id="quick-search" type="search" data-i18n-placeholder="searchMyWords" data-i18n-aria="searchMyWords" placeholder="Search my words" aria-label="Search my words" autocomplete="off">
+                <button class="tint" type="submit" data-i18n-aria="searchMyWords" aria-label="Search my words">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </form>
+            </section>
             <section id="calendar-setup">
               <h2 data-i18n="calendar">Calendar</h2>
               <p class="hint" data-i18n="calendarHint">Paste the secret iCal address from Google Calendar.</p>
@@ -1553,6 +1587,8 @@
       yourSentence: "Your sentence",
       checkSentence: "Check sentence",
       search: "Search",
+      quickSearch: "Quick search",
+      searchMyWords: "Search my words",
       searchResults: "Best matches",
       connectCalendar: "Connect Google Calendar to see your next Arabic lesson.",
       noLesson: "No upcoming Preply lesson on that calendar.",
@@ -3982,6 +4018,19 @@
     applyLanguage(learningLanguage);
     runMotion();
     const searchField = document.querySelector("#search");
+    document.querySelector("#quick-search-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = document.querySelector("#quick-search").value.trim();
+      if (!query) {
+        document.querySelector("#quick-search").focus();
+        return;
+      }
+      clearTimeout(searchTimer);
+      searchField.value = query;
+      showTab("words");
+      loadLibrary().catch(() => {});
+      searchField.focus();
+    });
     searchField.addEventListener("input", scheduleLibrarySearch);
     searchField.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
