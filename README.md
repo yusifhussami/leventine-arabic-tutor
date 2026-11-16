@@ -1,6 +1,6 @@
 # Sawt
 
-Sawt is a practice notebook. After class you paste new words with meanings. Before the next class you talk with those words, or write a sentence with one of them. The app UI stays English. In Settings you choose the language you’re learning — Levantine Arabic (Arabizi, Arabic speech) or Japanese (romaji, Japanese speech).
+Sawt is a learning notebook for lessons, vocabulary, grammar, and sentence homework. After class, capture the words and rules you learned. Write your own sentences, save attempts, and keep your teacher’s corrections alongside the originals. Recap asks you to recall the rule before revealing your notes. The app UI stays English. In Settings you choose the language you’re learning — Levantine Arabic (Arabizi, Arabic speech) or Japanese (romaji, Japanese speech).
 
 Locally it runs on this computer with SQLite. On Vercel each person signs in, and their words live in Postgres. Sentence checks, Talk replies, and speech go to OpenRouter.
 
@@ -12,11 +12,14 @@ python3 -m lexicon.serve
 
 Open [http://127.0.0.1:8765](http://127.0.0.1:8765). No Clerk sign-in is required for that local server.
 
-- **Today** is where a lesson gets pasted. Arabic: `baza5 = fancy` or `practice - tadreeb`. Japanese: `hello - konnichiwa` or `mizu = water` (romaji). Preview shows the split before you save.
-- **Settings** (under Words) has account sign-in and **Language you’re learning** (Levantine Arabic or Japanese). UI stays English; mic, TTS, spellings, and your word list follow the choice — each language has its own notebook on the account. **Import a CSV** on Today: Arabic sheets use Word/Arabizi + Meaning; Japanese sheets use Kanji + Kana (hiragana/katakana) + Meaning — practice stores kana, with kanji kept on the meaning line. Date Added groups rows by lesson day; rows without a date use the lesson date field.
-- **Words** lists everything saved, grouped by the lesson date. Levantine rows show the Arabic spelling beside the Arabizi (right to left). Edit changes the Arabizi, the Arabic, or the meaning. An Arabic edit is kept; a later fill will not replace it. A spelling with a space is stored as a phrase. **Export CSV** downloads every word in the current language as `sawt-words-YYYY-MM-DD.csv` (UTF-8). Levantine files put Arabic between Arabizi and English. Japanese files have no Arabic column.
-- **Practice** is the voice page. Tap the circle to talk. Coffee, Restaurant, Shop, and Taxi put Sawt in that place. You can also type a line, or open a saved word and check one sentence. Light and dark follow the system appearance.
-- **Topics** proposes one situation for the next lesson from words already saved, plus a few alternates. Mark it done after you use it with Amer, or skip it. The next suggestion avoids titles you already did. Arabic examples stay Levantine Arabizi; Japanese examples stay romaji. The app stays in English.
+- **Today** shows unfinished sentence homework and rules due for recap. Quick word capture and CSV import remain in the expandable section below.
+- **Lessons** captures a date, teacher, practice goal, words, grammar rules, notes, and homework. Grammar-only lessons and already-known words are supported. Saving creates a sentence brief with explicit word and rule requirements. Drafts use revision checks. Submitted attempts and corrections are separate records. Mark homework ready explicitly.
+- **Knowledge** stores explanations, examples, sources, and rule recall. The green-book guide contains original prompts with printed-page references to Matthew Aldrich’s *Levantine Arabic Verbs*. The private scanned PDF is not bundled. Recall ratings schedule another look after one, three, or seven days. Existing vocabulary cards retain FSRS.
+- **Words** retains saved vocabulary, Arabic spellings, editing, and CSV export. Its Dictionary tab searches the cached Arwords index in English, Arabic, and available Arabizi. Opening a result loads additional public forms when available. Saving a result is explicit. **Forms** keeps nouns, adjectives, past, bare imperfect, habitual present, imperative, continuous constructions, and participles with their subject, meaning, example, and source. Missing forms remain editable. AI suggestions require review and stay labelled.
+- **Cards** keeps existing vocabulary and Anki progress. Arabic writing preferences still use the current saved spellings.
+- **Settings** controls account, appearance, and learning language. Arabic and Japanese notebooks remain separate. The iPhone app’s Learn tab uses the same lesson, homework, recall, dictionary, and word-family APIs.
+
+No documented public Arwords API was found. Dictionary lookup uses the existing cached public index, with source links. Arabizi and inflection coverage are incomplete. Additional dictionary forms are fetched only when requested. The app does not infer an entire family from an Arabic root.
 
 Arabizi digits (Arabic): 2 ء/أ, 3 ع, 3' غ, 5 خ, 6 ط, 7 ح, 8 ق, 9 ص, 9' ض. Long ee and oo stay as ee and oo. كيفك is keefak. Japanese mode uses Hepburn romaji on the page and Japanese script for speech.
 

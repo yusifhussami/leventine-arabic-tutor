@@ -113,6 +113,10 @@ CREATE TABLE IF NOT EXISTS script_cache (
 );
 """
 
+from lexicon.learning_schema import learning_schema
+
+PG_SCHEMA += learning_schema("postgres")
+
 # Idempotent upgrades for databases created before these columns existed.
 # Postgres accepts IF NOT EXISTS. SQLite uses a column check in load.py.
 ARABIC_ITEM_ALTERS = (

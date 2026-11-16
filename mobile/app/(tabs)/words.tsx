@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -72,6 +73,7 @@ export default function WordsScreen() {
         />
       </View>
       <BodyScroll>
+        {language === "arabic" ? <Button label="Search the dictionary" kind="secondary" onPress={() => router.navigate({ pathname: "/learn", params: { view: "dictionary" } })} /> : null}
         {language === "arabic" ? (
           <View style={{ gap: 12 }}>
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -122,6 +124,7 @@ export default function WordsScreen() {
                 onArabic={setArabic}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
+                onForms={() => router.navigate({ pathname: "/learn", params: { wordId: String(item.id) } })}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
@@ -158,6 +161,7 @@ export default function WordsScreen() {
                 onArabic={setArabic}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
+                onForms={() => router.navigate({ pathname: "/learn", params: { wordId: String(item.id) } })}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
@@ -195,6 +199,7 @@ function WordRow({
   onSpelling,
   onGloss,
   onEdit,
+  onForms,
   onCancel,
   onSave,
 }: {
@@ -208,6 +213,7 @@ function WordRow({
   onSpelling: (value: string) => void;
   onGloss: (value: string) => void;
   onEdit: () => void;
+  onForms: () => void;
   onCancel: () => void;
   onSave: () => void;
 }) {
@@ -250,6 +256,7 @@ function WordRow({
         <Text style={{ color: theme.secondary, marginTop: 2 }}>{item.gloss}</Text>
       </View>
       <Text style={{ color: theme.secondary, fontSize: 12 }}>{item.kind}</Text>
+      {language === "arabic" ? <Pressable onPress={onForms} hitSlop={8}><Text style={{ color: theme.blueText }}>Forms</Text></Pressable> : null}
       <Pressable onPress={onEdit} hitSlop={8}>
         <Text style={{ color: theme.blueText, fontWeight: "600" }}>{UI.edit}</Text>
       </Pressable>

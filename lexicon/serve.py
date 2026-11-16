@@ -13,10 +13,10 @@ from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar
 from lexicon.cards import dispatch_get, dispatch_post, import_apkg
 from lexicon.db import LOCAL_USER, open_db
 from lexicon.http_api import file_response
+from lexicon import learning, wordbook
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.notebook import (
-    drop_exact_duplicates,
     export_words_csv,
     import_csv,
     judge_saved_item,
@@ -47,6 +47,10 @@ class NotebookHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self._bytes(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+            return
+        if path in {"/learning.js", "/learning.css"}:
+            asset = PAGE.parent / path.lstrip("/")
+            self._bytes(200, asset.read_bytes(), "text/javascript; charset=utf-8" if path.endswith(".js") else "text/css; charset=utf-8")
             return
         if path == "/api/config":
             self._json(200, {"clerkPublishableKey": "", "authRequired": False})
@@ -97,11 +101,23 @@ class NotebookHandler(BaseHTTPRequestHandler):
             finally:
                 conn.close()
             return
+        if path in {"/api/items", "/api/lessons"}:
+            query = parse_qs(urlparse(self.path).query)
+            action = query.get("action", [""])[0]
+            if path == "/api/lessons" or action in {"dictionary", "dictionary-entry", "family"}:
+                conn = _db()
+                try:
+                    result = learning.dispatch_get(conn, LOCAL_USER, action, query.get("id", [""])[0]) if path == "/api/lessons" else wordbook.dispatch_get(conn, LOCAL_USER, action, query.get("q", [""])[0], query.get("id", [""])[0])
+                    self._json(200, result)
+                except (ValueError, LookupError) as exc:
+                    self._json(400, {"error": str(exc)})
+                finally:
+                    conn.close()
+                return
         if path == "/api/items":
             conn = _db()
             try:
                 language = get_language(conn, LOCAL_USER)
-                drop_exact_duplicates(conn, LOCAL_USER, language=language)
                 params = parse_qs(urlparse(self.path).query)
                 if (params.get("format", [""])[0] or "").strip().lower() == "csv":
                     filename, text = export_words_csv(
@@ -216,6 +232,22 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 finally:
                     conn.close()
                 self._json(200, saved)
+                return
+            if path == "/api/lessons" and body.get("action"):
+                conn = _db()
+                try:
+                    result = learning.dispatch_post(conn, LOCAL_USER, body)
+                finally:
+                    conn.close()
+                self._json(200, result)
+                return
+            if path == "/api/items" and body.get("action") in {"save-dictionary", "save-family", "dictionary-forms", "suggest-family"}:
+                conn = _db()
+                try:
+                    result = wordbook.dispatch_post(conn, LOCAL_USER, body)
+                finally:
+                    conn.close()
+                self._json(200, result)
                 return
             if path == "/api/lessons":
                 conn = _db()

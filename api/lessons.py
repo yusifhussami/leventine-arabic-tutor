@@ -10,14 +10,25 @@ from lexicon.http_api import (
 )
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.notebook import save_lesson
+from lexicon import learning
 from lexicon.prefs import get_language
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        def run():
+            user_id = require_user(self)
+            result = with_db(lambda conn: learning.dispatch_get(conn, user_id, query_param(self, "action"), query_param(self, "id")))
+            json_response(self, 200, result)
+        handle_errors(self, run)
+
     def do_POST(self):
         def run():
             user_id = require_user(self)
             body = read_json(self)
+            if body.get("action"):
+                json_response(self, 200, with_db(lambda conn: learning.dispatch_post(conn, user_id, body)))
+                return
             if query_param(self, "preview") == "1" or body.get("preview"):
 
                 def preview(conn):

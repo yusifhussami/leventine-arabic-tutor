@@ -1,5 +1,7 @@
 # Sawt for iPhone
 
+The Learn tab starts the teacher-lesson workflow: capture words and rules, write sentence homework, save attempts and corrections, and recap grammar. Words links to dictionary search and word families. These screens use the same account-scoped Python APIs as the website. Native changes need a new app build; a website deployment does not update an installed iPhone app.
+
 This is the native iPhone app for Sawt. It is the same notebook as the website: Today, Practice, Words, Checklist, and Settings. It calls the existing Vercel (or local) API. It does not add server routes, so the Vercel Hobby function limit is unchanged.
 
 The interface follows the website’s colors, type, and wording, and uses iPhone conventions: a native tab bar, safe areas, haptics, the system keyboard, and light or dark mode from the system setting.
