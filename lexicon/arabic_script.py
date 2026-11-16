@@ -1,15 +1,8 @@
-"""Levantine Arabic script for a saved Arabizi spelling.
+"""Match saved Arabizi to Arabic using the bundled Arwords index first.
 
-Living Arabic's terms forbid automated access, and Levantine Dictionary does
-not publish an API. The check against a dictionary goes through the English
-Wiktionary Action API, which MediaWiki documents for this kind of read: one
-request at a time, a named User-Agent, maxlag, and a local cache. Pages are
-not scraped.
-
-Arabizi has no single spelling, so the English gloss picks the Wiktionary
-sense and the Arabizi picks which translation line (North or South Levantine
-first). A miss falls through to the same OpenRouter model the rest of Sawt
-uses. A spelling the learner typed is stored as user and is never replaced.
+English Wiktionary and the existing model suggestion flow handle dictionary
+misses. User-edited spellings are preserved. Sources stay attached to each
+result so the learner can distinguish dictionary matches from AI suggestions.
 """
 
 from __future__ import annotations
@@ -27,10 +20,11 @@ from lexicon.db import open_db
 from lexicon.judge import MODEL, RateLimiter, _json_body, complete, message_text, read_api_key
 from lexicon.load import normalize_meaning, normalize_word
 
+SOURCE_ARWORDS = "arwords"
 SOURCE_DICTIONARY = "dictionary"
 SOURCE_AI = "ai"
 SOURCE_USER = "user"
-SOURCES = frozenset({SOURCE_DICTIONARY, SOURCE_AI, SOURCE_USER})
+SOURCES = frozenset({SOURCE_ARWORDS, SOURCE_DICTIONARY, SOURCE_AI, SOURCE_USER})
 
 WIKTIONARY_API = "https://en.wiktionary.org/w/api.php"
 USER_AGENT = (
@@ -776,6 +770,20 @@ def resolve_rows(conn, rows: list[dict], *, opener=urllib.request.urlopen, compl
     """
     if not rows:
         return []
+    from lexicon.arwords import match as arwords_match
+
+    arwords_hits = []
+    remaining = []
+    for row in rows:
+        hit = arwords_match(row["spelling"], row["gloss"])
+        if hit:
+            arwords_hits.append({"id": row["id"], "arabic": hit, "source": SOURCE_ARWORDS})
+            _remember(conn, row, hit, SOURCE_ARWORDS)
+        else:
+            remaining.append(row)
+    rows = remaining
+    if not rows:
+        return arwords_hits
     pages = PageSource(conn, opener=opener, pace=pace)
     titles: list[str] = []
     for row in rows:
@@ -784,7 +792,7 @@ def resolve_rows(conn, rows: list[dict], *, opener=urllib.request.urlopen, compl
             titles.append(head + "/translations")
     pages.prefetch(titles)
 
-    resolved: list[dict] = []
+    resolved: list[dict] = arwords_hits
     unmatched: list[dict] = []
     for row in rows:
         cached = _cached_result(conn, row["spelling"], row["gloss"])
@@ -846,7 +854,7 @@ def _cached_result(conn, spelling: str, gloss: str) -> dict | None:
         return None
     arabic = clean_arabic(data.get("arabic") or "")
     source = data.get("source") or ""
-    if arabic and source in {SOURCE_DICTIONARY, SOURCE_AI}:
+    if arabic and source in {SOURCE_ARWORDS, SOURCE_DICTIONARY, SOURCE_AI}:
         return {"arabic": arabic, "source": source}
     return None
 
@@ -909,7 +917,7 @@ def apply_arabic(conn, resolutions: list[dict]) -> list[int]:
         for item in resolutions:
             arabic = clean_arabic(str(item.get("arabic") or ""))
             source = item.get("source") or ""
-            if source not in {SOURCE_DICTIONARY, SOURCE_AI} or not arabic:
+            if source not in {SOURCE_ARWORDS, SOURCE_DICTIONARY, SOURCE_AI} or not arabic:
                 continue
             cursor = conn.execute(
                 """
@@ -944,7 +952,7 @@ def fill_arabic_items(
         resolutions = list(resolver(rows) or [])
     wrote = apply_arabic(conn, resolutions)
     wrote_set = set(wrote)
-    by_source = {SOURCE_DICTIONARY: 0, SOURCE_AI: 0}
+    by_source = {SOURCE_ARWORDS: 0, SOURCE_DICTIONARY: 0, SOURCE_AI: 0}
     for item in resolutions:
         if int(item.get("id") or 0) in wrote_set and item.get("source") in by_source:
             by_source[item["source"]] += 1
@@ -957,7 +965,8 @@ def fill_arabic_items(
         remaining_ids = [row["id"] for row in remaining_rows]
     return {
         "filled": len(wrote),
-        "dictionary": by_source[SOURCE_DICTIONARY],
+        "dictionary": by_source[SOURCE_DICTIONARY] + by_source[SOURCE_ARWORDS],
+        "arwords": by_source[SOURCE_ARWORDS],
         "ai": by_source[SOURCE_AI],
         "filled_ids": wrote,
         "remaining": remaining,
@@ -993,7 +1002,7 @@ def backfill(conn, *, user_id: str | None = None, batch: int = 12, limit: int | 
         for item in resolutions:
             if int(item.get("id") or 0) not in wrote_set:
                 continue
-            if item.get("source") == SOURCE_DICTIONARY:
+            if item.get("source") in {SOURCE_DICTIONARY, SOURCE_ARWORDS}:
                 stats["dictionary"] += 1
             elif item.get("source") == SOURCE_AI:
                 stats["ai"] += 1

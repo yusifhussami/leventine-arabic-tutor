@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 
 from lexicon.arabic_script import fill_arabic_items
+from lexicon.arwords import match_notebook
 from lexicon.http_api import (
     file_response,
     handle_errors,
@@ -55,11 +56,14 @@ class handler(BaseHTTPRequestHandler):
         def run():
             user_id = require_user(self)
             body = read_json(self)
-            if (body.get("action") or "").strip() != "fill-arabic":
+            action = (body.get("action") or "").strip()
+            if action not in {"fill-arabic", "match-arwords"}:
                 json_response(self, 404, {"error": "not found"})
                 return
 
             def work(conn):
+                if action == "match-arwords":
+                    return match_notebook(conn, user_id)
                 # Best-effort after a save. The lesson itself is already stored.
                 return fill_arabic_items(
                     conn,

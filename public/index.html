@@ -618,6 +618,10 @@
     .words-bar .count { margin: 0; }
     #export-words { flex-shrink: 0; }
     #export-words:disabled { opacity: 0.55; }
+    #words-writing-tabs { margin-bottom: 16px; }
+    #words-writing-tabs[hidden], #arabic-spelling-tools[hidden] { display: none; }
+    #words-writing-tabs [aria-selected="true"] { color: var(--blue); background: var(--fill); }
+    #arabic-spelling-tools { margin-bottom: 20px; }
     #practice[hidden], #practice-empty[hidden] { display: none; }
     #pane-practice #practice {
       background: var(--window);
@@ -1666,6 +1670,15 @@
           <div class="words-bar">
             <p id="word-count" class="count"></p>
             <button id="export-words" class="secondary" type="button" data-i18n="exportWords" data-i18n-aria="exportWordsAria" aria-label="Download every saved word in this language as a CSV file">Export CSV</button>
+          </div>
+          <div id="words-writing-tabs" class="row" role="tablist" aria-label="Word display">
+            <button id="words-all-tab" class="secondary" type="button" role="tab" aria-selected="true" aria-controls="library">All words</button>
+            <button id="words-arabic-tab" class="secondary" type="button" role="tab" aria-selected="false" aria-controls="library">Arabic spelling</button>
+          </div>
+          <div id="arabic-spelling-tools" hidden>
+            <p class="hint">Match your saved and CSV-imported words with <a href="https://www.arwords.com/" target="_blank" rel="noopener noreferrer">Arwords</a>. Matches use both Arabizi and meaning. Your edits are kept.</p>
+            <button id="match-arwords" class="tint" type="button">Match my words</button>
+            <p id="arwords-status" class="hint" role="status"></p>
           </div>
           <p id="library-error" class="error"></p>
           <div id="library"></div>
@@ -3170,6 +3183,7 @@
             id: item.id,
             spelling: item.spelling,
             gloss: item.gloss,
+            arabic_script: item.arabic_script,
             in_deck: false,
           }));
         }
@@ -3248,7 +3262,7 @@
       list.replaceChildren();
       const shown = cardsCompose.words.filter((word) => {
         if (!query) return true;
-        return (word.spelling + " " + word.gloss).toLowerCase().includes(query);
+        return (word.spelling + " " + (word.arabic_script || "") + " " + word.gloss).toLowerCase().includes(query);
       });
       if (!shown.length) {
         list.append(node("p", "hint", cardsCompose.words.length ? "No words match." : "Save words on Today, then make a deck."));
@@ -3264,7 +3278,8 @@
         mark.className = "cards-check";
         mark.innerHTML = checklistCircle(on);
         const copy = node("span", "cards-word-copy");
-        const spell = node("span", "cards-word-spell", word.spelling);
+        const display = learningLanguage === "arabic" && cardsSettings.script === "arabic" ? word.arabic_script || word.spelling : word.spelling;
+        const spell = node("span", "cards-word-spell", display);
         spell.dir = "auto";
         copy.append(spell, node("span", "cards-word-gloss", word.gloss));
         row.append(mark, copy);
@@ -3361,6 +3376,23 @@
         },
         hint: "How many unseen cards to introduce each day, like Anki. Reviews are unlimited. 0 means reviews only.",
       }));
+
+      if (settings.language === "arabic") {
+        const writing = node("section", "cards-group");
+        writing.append(node("h3", null, "Writing"));
+        writing.append(node("p", "hint", "Arabic uses the spelling saved in Words. Words without an Arabic spelling keep their Arabizi until matched or edited. Imported decks keep their original text."));
+        const options = node("div", "deck-list");
+        for (const [id, label] of [["arabizi", "Arabizi"], ["arabic", "Arabic spelling"]]) {
+          const button = node("button", "deck-row cards-choice", label);
+          button.type = "button";
+          button.disabled = cardsSettingsBusy;
+          button.setAttribute("aria-pressed", settings.script === id ? "true" : "false");
+          button.onclick = () => { if (settings.script !== id) saveCardSettings({ script: id }); };
+          options.append(button);
+        }
+        writing.append(options);
+        home.append(writing);
+      }
 
       const side = node("section", "cards-group");
       side.append(node("h3", null, "Show first"));
@@ -3870,7 +3902,46 @@
       );
     }
 
+    let wordsWriting = "all";
+    let matchingArwords = false;
+
+    function syncWordsWriting() {
+      const arabic = learningLanguage === "arabic";
+      document.querySelector("#words-writing-tabs").hidden = !arabic;
+      document.querySelector("#arabic-spelling-tools").hidden = !arabic || wordsWriting !== "arabic";
+      document.querySelector("#words-all-tab").setAttribute("aria-selected", wordsWriting === "all" ? "true" : "false");
+      document.querySelector("#words-arabic-tab").setAttribute("aria-selected", wordsWriting === "arabic" ? "true" : "false");
+    }
+
+    for (const [id, view] of [["words-all-tab", "all"], ["words-arabic-tab", "arabic"]]) {
+      document.querySelector("#" + id).onclick = () => {
+        wordsWriting = view;
+        syncWordsWriting();
+        loadLibrary().catch(() => {});
+      };
+    }
+    document.querySelector("#match-arwords").onclick = async () => {
+      if (matchingArwords) return;
+      matchingArwords = true;
+      const button = document.querySelector("#match-arwords");
+      const status = document.querySelector("#arwords-status");
+      button.disabled = true;
+      status.textContent = "Matching your words…";
+      try {
+        const result = await post("/api/items", { action: "match-arwords" });
+        status.textContent = `${result.matched} matched · ${result.unchanged} already saved or edited · ${result.unresolved} without a confident Arwords match. You can edit Arabic spellings with Edit.`;
+        await loadLibrary();
+        await loadRecent();
+      } catch (err) {
+        status.textContent = err.message || "Could not match words. Try again.";
+      } finally {
+        matchingArwords = false;
+        button.disabled = false;
+      }
+    };
+
     function renderLibrary(items, query, { pending = false } = {}) {
+      syncWordsWriting();
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
@@ -3923,12 +3994,12 @@
       if (learningLanguage === "arabic") {
         const head = document.createElement("thead");
         const labels = document.createElement("tr");
-        for (const label of [t("colArabizi"), t("colArabic"), t("colGloss"), "", ""]) {
+        for (const label of [...(wordsWriting === "arabic" ? [t("colArabic"), t("colArabizi")] : [t("colArabizi"), t("colArabic")]), t("colGloss"), "", ""]) {
           const th = document.createElement("th");
           th.textContent = label;
           if (label === t("colArabic")) {
             th.className = "arabic-col";
-            th.title = "Levantine spelling. Dictionary matches come from English Wiktionary (CC BY-SA).";
+            th.title = "Levantine spelling from Arwords, English Wiktionary, or your edits. AI suggestions are labelled.";
           }
           labels.append(th);
         }
@@ -4030,6 +4101,7 @@
     }
 
     function arabicSourceTitle(source) {
+      if (source === "arwords") return "Arabic spelling matched from Arwords";
       if (source === "user") return "Arabic spelling you edited";
       if (source === "dictionary") return "Arabic spelling from English Wiktionary";
       if (source === "ai") return "Arabic spelling suggested from the Arabizi";
@@ -4052,8 +4124,14 @@
       cell.className = "arabic-script arabic-col";
       cell.dir = "rtl";
       cell.lang = "ar";
-      cell.textContent = (item && item.arabic_script) || "";
+      cell.textContent = (item && item.arabic_script) || "—";
       cell.title = arabicSourceTitle(item && item.arabic_source);
+      if (wordsWriting === "arabic") {
+        const source = node("small", "hint", item.arabic_source === "arwords" ? "Arwords" : item.arabic_source === "user" ? "Your edit" : item.arabic_source === "ai" ? "AI suggestion — review" : item.arabic_source === "dictionary" ? "Wiktionary" : "No spelling yet");
+        source.dir = "ltr";
+        source.style.display = "block";
+        cell.append(source);
+      }
       return cell;
     }
 
@@ -4109,7 +4187,10 @@
       edit.textContent = t("edit");
       edit.onclick = () => beginEdit(row, item);
       editCell.append(edit);
-      if (learningLanguage === "arabic") row.append(cell, arabicCell(item), gloss, kind, editCell);
+      if (learningLanguage === "arabic") {
+        const spellingCells = wordsWriting === "arabic" ? [arabicCell(item), cell] : [cell, arabicCell(item)];
+        row.append(...spellingCells, gloss, kind, editCell);
+      }
       else row.append(cell, gloss, kind, editCell);
       return row;
     }
@@ -4160,7 +4241,10 @@
       gloss.onkeydown = onKey;
       arabic.onkeydown = onKey;
       actions.append(save, cancel);
-      if (learningLanguage === "arabic") row.replaceChildren(spellingCell, arabicEditCell, glossCell, actions);
+      if (learningLanguage === "arabic") {
+        const spellingCells = wordsWriting === "arabic" ? [arabicEditCell, spellingCell] : [spellingCell, arabicEditCell];
+        row.replaceChildren(...spellingCells, glossCell, actions);
+      }
       else row.replaceChildren(spellingCell, glossCell, actions);
       spelling.focus();
     }

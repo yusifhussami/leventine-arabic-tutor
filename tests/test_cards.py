@@ -308,13 +308,48 @@ class CardDeckTests(unittest.TestCase):
         shown = list_decks(self.conn, "local", now=NOW)
         self.assertEqual(shown["words"][0]["name"], "Arabic")
 
+    def test_arabic_writing_uses_live_spelling_and_keeps_review_progress(self) -> None:
+        item = list_items(self.conn)[0]
+        self.conn.execute("UPDATE lesson_items SET arabic_script = 'كيفك', arabic_source = 'arwords' WHERE id = ?", (item["id"],))
+        self.conn.commit()
+        opened = create_word_deck(self.conn, "local", "Arabic", [item["id"]], now=NOW)
+        deck_id = opened["deck"]["id"]
+        before = dict(self.conn.execute("SELECT * FROM study_cards WHERE id = ?", (opened["card"]["id"],)).fetchone())
+        settings = save_card_settings(self.conn, "local", {"script": "arabic"})
+        self.assertEqual(settings["script"], "arabic")
+        self.assertEqual(settings["preview_prompt"], "كيفك")
+        self.assertEqual(study(self.conn, "local", deck_id, now=NOW)["card"]["front"], "كيفك")
+        self.conn.execute("UPDATE lesson_items SET arabic_script = 'كيفَك' WHERE id = ?", (item["id"],))
+        self.conn.commit()
+        save_card_settings(self.conn, "local", {"side": "meaning"})
+        flipped = study(self.conn, "local", deck_id, now=NOW)
+        self.assertEqual(flipped["card"]["front"], item["gloss"])
+        self.assertEqual(flipped["card"]["back"], "كيفَك")
+        after = dict(self.conn.execute("SELECT * FROM study_cards WHERE id = ?", (opened["card"]["id"],)).fetchone())
+        self.assertEqual(after, before)
+        self.assertEqual(card_settings(self.conn, "other")["script"], "arabizi")
+        with self.assertRaises(ValueError):
+            save_card_settings(self.conn, "local", {"script": "unknown"})
+
+    def test_arabic_mode_falls_back_for_missing_spellings_and_preserves_imports(self) -> None:
+        item = list_items(self.conn)[0]
+        deck = create_word_deck(self.conn, "local", "Unmatched", [item["id"]], now=NOW)
+        save_card_settings(self.conn, "local", {"script": "arabic"})
+        self.assertEqual(study(self.conn, "local", deck["deck"]["id"], now=NOW)["card"]["front"], item["spelling"])
+        import_apkg(self.conn, _anki_package(), "local", now=NOW)
+        listed = list_decks(self.conn, "local", now=NOW)
+        imported_deck = listed["anki"][0]
+        shown = study(self.conn, "local", imported_deck["id"], now=NOW)
+        self.assertNotEqual(shown["card"]["front"], "")
+        self.assertIsNone(self.conn.execute("SELECT item_id FROM study_cards WHERE id = ?", (shown["card"]["id"],)).fetchone()["item_id"])
+
     def test_settings_flip_the_prompt_and_remember_the_timer(self) -> None:
         items = list_items(self.conn)
         opened = card_settings(self.conn, "local")
         self.assertEqual(opened["side"], "word")
         self.assertFalse(opened["timer"])
         self.assertEqual(opened["new_per_day"], 20)
-        self.assertEqual(opened["prompt_label"], "Arabic")
+        self.assertEqual(opened["prompt_label"], "Arabizi")
         self.assertEqual(opened["preview_prompt"], items[0]["spelling"])
         self.assertEqual(opened["preview_answer"], items[0]["gloss"])
         self.assertFalse(opened["preview_example"])

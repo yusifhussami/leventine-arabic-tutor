@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { loadItems, updateItem } from "@/src/api";
-import { BodyScroll, Button, ErrorText, Screen } from "@/src/components/ui";
+import { BodyScroll, Button, ErrorText, Hint, Screen } from "@/src/components/ui";
 import { UI, copy, wordCount } from "@/src/copy";
 import { formatDay, groupByDate } from "@/src/logic";
 import { usePractice } from "@/src/practice";
@@ -20,6 +20,10 @@ export default function WordsScreen() {
   const [editing, setEditing] = useState<number | null>(null);
   const [spelling, setSpelling] = useState("");
   const [gloss, setGloss] = useState("");
+  const [arabic, setArabic] = useState("");
+  const [writing, setWriting] = useState<"all" | "arabic">("all");
+  const [matching, setMatching] = useState(false);
+  const [matchStatus, setMatchStatus] = useState("");
   const request = useRef(0);
 
   useEffect(() => {
@@ -68,6 +72,32 @@ export default function WordsScreen() {
         />
       </View>
       <BodyScroll>
+        {language === "arabic" ? (
+          <View style={{ gap: 12 }}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Button label="All words" kind={writing === "all" ? "tint" : "secondary"} onPress={() => setWriting("all")} />
+              <Button label="Arabic spelling" kind={writing === "arabic" ? "tint" : "secondary"} onPress={() => setWriting("arabic")} />
+            </View>
+            {writing === "arabic" ? (
+              <View style={{ gap: 8 }}>
+                <Hint>Match saved and CSV-imported words with Arwords using Arabizi and meaning. Your edits are kept.</Hint>
+                <Button label={matching ? "Matching…" : "Match my words"} disabled={matching} onPress={() => {
+                  setMatching(true);
+                  setMatchStatus("");
+                  setError("");
+                  api.post<{ matched: number; unchanged: number; unresolved: number }>("/api/items", { action: "match-arwords" })
+                    .then((result) => {
+                      setMatchStatus(`${result.matched} matched · ${result.unchanged} already saved or edited · ${result.unresolved} without a confident match`);
+                      touchLibrary();
+                    })
+                    .catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not match words. Try again."))
+                    .finally(() => setMatching(false));
+                }} />
+                {matchStatus ? <Hint>{matchStatus}</Hint> : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         <ErrorText>{error}</ErrorText>
         {items.length === 0 ? (
           <View style={{ gap: 6 }}>
@@ -87,17 +117,21 @@ export default function WordsScreen() {
                 editing={editing === item.id}
                 spelling={spelling}
                 gloss={gloss}
+                arabic={arabic}
+                arabicFirst={language === "arabic" && writing === "arabic"}
+                onArabic={setArabic}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
                   setGloss(item.gloss);
+                  setArabic(item.arabic_script || "");
                   setError("");
                 }}
                 onCancel={() => setEditing(null)}
                 onSave={() => {
-                  updateItem(api, item.id, spelling, gloss)
+                  updateItem(api, item.id, spelling, gloss, language === "arabic" ? arabic : undefined)
                     .then((saved) => {
                       setEditing(null);
                       patchWord(item.id, saved.spelling || spelling, saved.gloss || gloss);
@@ -119,17 +153,21 @@ export default function WordsScreen() {
                 editing={editing === item.id}
                 spelling={spelling}
                 gloss={gloss}
+                arabic={arabic}
+                arabicFirst={language === "arabic" && writing === "arabic"}
+                onArabic={setArabic}
                 onSpelling={setSpelling}
                 onGloss={setGloss}
                 onEdit={() => {
                   setEditing(item.id);
                   setSpelling(item.spelling);
                   setGloss(item.gloss);
+                  setArabic(item.arabic_script || "");
                   setError("");
                 }}
                 onCancel={() => setEditing(null)}
                 onSave={() => {
-                  updateItem(api, item.id, spelling, gloss)
+                  updateItem(api, item.id, spelling, gloss, language === "arabic" ? arabic : undefined)
                     .then((saved) => {
                       setEditing(null);
                       patchWord(item.id, saved.spelling || spelling, saved.gloss || gloss);
@@ -151,6 +189,9 @@ function WordRow({
   editing,
   spelling,
   gloss,
+  arabic,
+  arabicFirst,
+  onArabic,
   onSpelling,
   onGloss,
   onEdit,
@@ -161,6 +202,9 @@ function WordRow({
   editing: boolean;
   spelling: string;
   gloss: string;
+  arabic: string;
+  arabicFirst: boolean;
+  onArabic: (value: string) => void;
   onSpelling: (value: string) => void;
   onGloss: (value: string) => void;
   onEdit: () => void;
@@ -190,6 +234,7 @@ function WordRow({
           accessibilityLabel={copy(language, "colGloss")}
           style={{ minHeight: 40, color: theme.label, borderWidth: 1, borderColor: theme.separator, borderRadius: 8, paddingHorizontal: 10, backgroundColor: theme.field }}
         />
+        {language === "arabic" ? <TextInput value={arabic} onChangeText={onArabic} accessibilityLabel="Arabic spelling" placeholder="Arabic spelling" placeholderTextColor={theme.tertiary} style={{ minHeight: 40, color: theme.label, borderWidth: 1, borderColor: theme.separator, borderRadius: 8, paddingHorizontal: 10, writingDirection: "rtl", textAlign: "right" }} /> : null}
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Button label={UI.save} onPress={onSave} />
           <Button kind="text" label={UI.cancel} onPress={onCancel} />
@@ -200,7 +245,8 @@ function WordRow({
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.separator }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: theme.reading, fontSize: 20, color: theme.label }}>{item.spelling}</Text>
+        <Text style={{ fontFamily: theme.reading, fontSize: 20, color: theme.label, writingDirection: arabicFirst ? "rtl" : "auto", textAlign: arabicFirst ? "right" : "auto" }}>{arabicFirst ? item.arabic_script || "—" : item.spelling}</Text>
+        {arabicFirst ? <Text style={{ color: theme.secondary }}>{item.spelling} · {item.arabic_source === "arwords" ? "Arwords" : item.arabic_source === "user" ? "Your edit" : item.arabic_source === "ai" ? "AI suggestion — review" : item.arabic_source === "dictionary" ? "Wiktionary" : "No spelling yet"}</Text> : null}
         <Text style={{ color: theme.secondary, marginTop: 2 }}>{item.gloss}</Text>
       </View>
       <Text style={{ color: theme.secondary, fontSize: 12 }}>{item.kind}</Text>

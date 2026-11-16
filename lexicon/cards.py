@@ -165,7 +165,7 @@ def word_choices(conn, user_id: str, deck_id: int) -> list[dict]:
         raise ValueError("imported decks stay as they were imported")
     rows = conn.execute(
         """
-        SELECT i.id, i.spelling, i.gloss
+        SELECT i.id, i.spelling, i.gloss, i.arabic_script
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE l.user_id = ? AND l.language = ?
@@ -186,6 +186,7 @@ def word_choices(conn, user_id: str, deck_id: int) -> list[dict]:
             "id": row["id"],
             "spelling": row["spelling"],
             "gloss": row["gloss"],
+            "arabic_script": row["arabic_script"],
             "in_deck": row["id"] in chosen,
         }
         for row in rows
@@ -202,8 +203,10 @@ def card_settings(conn, user_id: str) -> dict:
     return {
         "timer": _card_timer(conn, user_id),
         "side": side,
+        "script": _card_script(conn, user_id),
+        "language": language,
         "new_per_day": _new_per_day(conn, user_id),
-        "prompt_label": "Japanese" if language == "japanese" else "Arabic",
+        "prompt_label": "Japanese" if language == "japanese" else ("Arabic script" if _card_script(conn, user_id) == "arabic" else "Arabizi"),
         "answer_label": "English",
         "preview_prompt": prompt,
         "preview_answer": answer,
@@ -212,12 +215,14 @@ def card_settings(conn, user_id: str) -> dict:
 
 
 def save_card_settings(conn, user_id: str, body: dict) -> dict:
-    if "timer" not in body and "side" not in body and "new_per_day" not in body:
+    if not any(key in body for key in ("timer", "side", "new_per_day", "script")):
         return card_settings(conn, user_id)
     if "timer" in body and not isinstance(body["timer"], bool):
         raise ValueError("timer is on or off")
     if "side" in body and body["side"] not in ("word", "meaning"):
         raise ValueError("show the word or the English")
+    if "script" in body and body["script"] not in ("arabizi", "arabic"):
+        raise ValueError("script must be arabizi or arabic")
     new_per_day = None
     if "new_per_day" in body:
         if isinstance(body["new_per_day"], bool):
@@ -229,6 +234,8 @@ def save_card_settings(conn, user_id: str, body: dict) -> dict:
         if requested < 0 or requested > 999:
             raise ValueError("new cards per day is 0–999")
         new_per_day = requested
+    if "script" in body:
+        _put_setting(conn, user_id, "cards_script", body["script"])
     if "timer" in body:
         _put_setting(conn, user_id, "cards_timer", "1" if body["timer"] else "0")
     if "side" in body:
@@ -535,12 +542,23 @@ def _study_settings(conn, user_id: str) -> dict:
     return {
         "timer": _card_timer(conn, user_id),
         "side": _card_side(conn, user_id),
+        "script": _card_script(conn, user_id),
         "new_per_day": _new_per_day(conn, user_id),
     }
 
 
 def _card_timer(conn, user_id: str) -> bool:
     return _setting(conn, user_id, "cards_timer") == "1"
+
+
+def _card_script(conn, user_id: str) -> str:
+    return "arabic" if _setting(conn, user_id, "cards_script") == "arabic" else "arabizi"
+
+
+def _word_face(conn, user_id: str, row) -> str:
+    if row["language"] == "arabic" and _card_script(conn, user_id) == "arabic":
+        return row["arabic_script"] or row["spelling"]
+    return row["spelling"]
 
 
 def _card_side(conn, user_id: str) -> str:
@@ -584,7 +602,7 @@ def learn_more(conn, user_id: str, deck_id: int, count, now: datetime | None = N
 def _preview_pair(conn, user_id: str, language: str) -> tuple[str, str, bool]:
     row = conn.execute(
         """
-        SELECT i.spelling, i.gloss
+        SELECT i.spelling, i.gloss, i.arabic_script, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE l.user_id = ? AND l.language = ?
@@ -594,10 +612,10 @@ def _preview_pair(conn, user_id: str, language: str) -> tuple[str, str, bool]:
         (user_id, language),
     ).fetchone()
     if row is not None:
-        return row["spelling"], row["gloss"], False
+        return _word_face(conn, user_id, row), row["gloss"], False
     if language == "japanese":
         return "ねこ", "cat", True
-    return "marhaba", "hello", True
+    return ("مرحبا" if _card_script(conn, user_id) == "arabic" else "marhaba"), "hello", True
 
 
 def _setting(conn, user_id: str, key: str) -> str:
@@ -621,7 +639,7 @@ def _faces(conn, user_id: str, card: dict) -> tuple[str, str]:
         return card["front"], card["back"]
     row = conn.execute(
         """
-        SELECT i.spelling, i.gloss
+        SELECT i.spelling, i.gloss, i.arabic_script, l.language
         FROM lesson_items i
         JOIN lessons l ON l.id = i.lesson_id
         WHERE i.id = ? AND l.user_id = ?
@@ -630,7 +648,7 @@ def _faces(conn, user_id: str, card: dict) -> tuple[str, str]:
     ).fetchone()
     if row is None:
         return card["front"], card["back"]
-    return row["spelling"], row["gloss"]
+    return _word_face(conn, user_id, row), row["gloss"]
 
 
 def _insert_word_cards(conn, deck_id: int, words: list[dict], now: datetime) -> None:
