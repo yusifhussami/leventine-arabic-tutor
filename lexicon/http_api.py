@@ -34,6 +34,25 @@ def bytes_response(handler, status: int, body: bytes, content_type: str) -> None
     handler.wfile.write(body)
 
 
+def file_response(handler, body: bytes, content_type: str, filename: str) -> None:
+    """Send a download. The name is quoted and cannot break the header line."""
+    safe = (
+        filename.replace("\\", "")
+        .replace('"', "")
+        .replace("\r", "")
+        .replace("\n", "")
+        .strip()
+        or "download"
+    )
+    handler.send_response(200)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Disposition", f'attachment; filename="{safe}"')
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 def ndjson_begin(handler, status: int = 200) -> None:
     """Start a streamed talk+speech response (reply line, then audio line)."""
     handler.send_response(status)

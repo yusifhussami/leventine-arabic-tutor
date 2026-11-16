@@ -8,13 +8,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from lexicon.arabic_script import fill_arabic_items
 from lexicon.calendar_feed import calendar_connected, next_lesson, save_calendar_url
 from lexicon.cards import dispatch_get, dispatch_post, import_apkg
 from lexicon.db import LOCAL_USER, open_db
+from lexicon.http_api import file_response
 from lexicon.intake import item_kind, parse_lesson_text
 from lexicon.judge import read_api_key
 from lexicon.notebook import (
     drop_exact_duplicates,
+    export_words_csv,
     import_csv,
     judge_saved_item,
     list_items,
@@ -26,6 +29,7 @@ from lexicon.notebook import (
 )
 from lexicon.prefs import get_language, normalize_language, save_language
 from lexicon.speak import speak_text, speech_stream_payload
+from lexicon.topics import generate_topics, list_topics, set_topic_status
 
 PAGE = Path(__file__).resolve().parent.parent / "public" / "index.html"
 if not PAGE.exists():
@@ -69,12 +73,48 @@ class NotebookHandler(BaseHTTPRequestHandler):
             finally:
                 conn.close()
             return
+        if path == "/api/topics":
+            query = parse_qs(urlparse(self.path).query)
+            conn = _db()
+            try:
+                language = normalize_language(
+                    query.get("language", [""])[0] or get_language(conn, LOCAL_USER)
+                )
+                self._json(
+                    200,
+                    {
+                        "language": language,
+                        "topics": list_topics(
+                            conn,
+                            user_id=LOCAL_USER,
+                            language=language,
+                            status=query.get("status", [""])[0],
+                        ),
+                    },
+                )
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+            finally:
+                conn.close()
+            return
         if path == "/api/items":
             conn = _db()
             try:
                 language = get_language(conn, LOCAL_USER)
                 drop_exact_duplicates(conn, LOCAL_USER, language=language)
-                query = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+                params = parse_qs(urlparse(self.path).query)
+                if (params.get("format", [""])[0] or "").strip().lower() == "csv":
+                    filename, text = export_words_csv(
+                        conn, user_id=LOCAL_USER, language=language
+                    )
+                    file_response(
+                        self,
+                        text.encode("utf-8"),
+                        "text/csv; charset=utf-8",
+                        filename,
+                    )
+                    return
+                query = params.get("q", [""])[0]
                 self._json(
                     200,
                     search_items(conn, query, user_id=LOCAL_USER, language=language)
@@ -142,7 +182,12 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 self._json(200, {"language": language})
                 return
             if path == "/api/preview":
-                pairs = parse_lesson_text(body.get("text") or "")
+                conn = _db()
+                try:
+                    language = get_language(conn, LOCAL_USER)
+                finally:
+                    conn.close()
+                pairs = parse_lesson_text(body.get("text") or "", language=language)
                 self._json(
                     200,
                     [
@@ -150,6 +195,19 @@ class NotebookHandler(BaseHTTPRequestHandler):
                         for spelling, gloss in pairs
                     ],
                 )
+                return
+            if path == "/api/items" and (body.get("action") or "").strip() == "fill-arabic":
+                conn = _db()
+                try:
+                    saved = fill_arabic_items(
+                        conn,
+                        user_id=LOCAL_USER,
+                        item_ids=body.get("ids"),
+                        limit=16,
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
                 return
             if path == "/api/lessons":
                 conn = _db()
@@ -239,6 +297,22 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     conn.close()
                 self._json(200, saved)
                 return
+            if path == "/api/topics":
+                conn = _db()
+                try:
+                    language = normalize_language(
+                        body.get("language") or get_language(conn, LOCAL_USER)
+                    )
+                    saved = generate_topics(
+                        conn,
+                        read_api_key(),
+                        user_id=LOCAL_USER,
+                        language=language,
+                    )
+                finally:
+                    conn.close()
+                self._json(200, saved)
+                return
             if path == "/api/practice":
                 conn = _db()
                 try:
@@ -267,6 +341,9 @@ class NotebookHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/topics":
+            self._update_topic()
+            return
         prefix = "/api/items/"
         if not path.startswith(prefix) or path.endswith("/similar"):
             self._json(404, {"error": "not found"})
@@ -289,6 +366,38 @@ class NotebookHandler(BaseHTTPRequestHandler):
                 body.get("spelling") or "",
                 body.get("gloss") or "",
                 user_id=LOCAL_USER,
+                arabic_script=body["arabic_script"] if "arabic_script" in body else None,
+            )
+        except (ValueError, LookupError) as exc:
+            self._json(400, {"error": str(exc)})
+            return
+        finally:
+            conn.close()
+        self._json(200, updated)
+
+    def _update_topic(self) -> None:
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+        except json.JSONDecodeError:
+            self._json(400, {"error": "send JSON"})
+            return
+        query = parse_qs(urlparse(self.path).query)
+        try:
+            topic_id = int(query.get("id", [""])[0])
+        except ValueError:
+            self._json(400, {"error": "need a topic id"})
+            return
+        conn = _db()
+        try:
+            language = normalize_language(
+                body.get("language") or get_language(conn, LOCAL_USER)
+            )
+            updated = set_topic_status(
+                conn,
+                topic_id,
+                body.get("status") or "",
+                user_id=LOCAL_USER,
+                language=language,
             )
         except (ValueError, LookupError) as exc:
             self._json(400, {"error": str(exc)})

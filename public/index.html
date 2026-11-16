@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f2f2f7">
   <title>Sawt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@500;600&display=swap" rel="stylesheet">
   <script>
     (function () {
       const saved = localStorage.getItem("appearance");
@@ -307,6 +310,41 @@
       font-size: 16px;
       font-weight: 500;
     }
+    .arabic-script {
+      font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Traditional Arabic", serif;
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1.45;
+      direction: rtl;
+      unicode-bidi: isolate;
+    }
+    td.arabic-col,
+    th.arabic-col {
+      width: 1%;
+      white-space: nowrap;
+      padding-inline-start: 8px;
+      padding-inline-end: 22px;
+    }
+    th.arabic-col {
+      font-family: var(--ui);
+      font-size: 11px;
+      font-weight: 600;
+      direction: ltr;
+      text-align: left;
+    }
+    .arabic-script:empty { padding: 0; }
+    #library td input.arabic-script {
+      font-size: 20px;
+      width: 100%;
+      min-width: 7em;
+      text-align: right;
+    }
+    #practice-title .arabic-script {
+      margin-inline-start: 14px;
+      font-size: 40px;
+      vertical-align: middle;
+    }
+    .today-hit .arabic-script { font-size: 22px; }
     .kind {
       color: var(--secondary);
       font-size: 11px;
@@ -387,6 +425,51 @@
       padding-left: 28px;
       border-radius: 6px;
       background: var(--field);
+    }
+    #pane-today.is-searching {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+    }
+    #pane-today.is-searching .document,
+    #pane-today.is-searching .inspector { display: none; }
+    .today-search {
+      grid-column: 1 / -1;
+      min-height: 0;
+      overflow: auto;
+      padding: 28px 40px 48px;
+    }
+    .today-search[hidden] { display: none; }
+    .today-search h2 { margin-bottom: 8px; }
+    #today-search-status:empty { display: none; }
+    .today-results {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+    .today-hit {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 16px;
+      width: 100%;
+      min-height: 44px;
+      margin: 0;
+      padding: 10px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--separator);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--label);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .today-hit:hover { background: var(--grouped); }
+    .today-hit .arabizi { flex: 0 1 auto; }
+    .today-hit-gloss {
+      color: var(--secondary);
+      font-size: 14px;
+      min-width: 0;
     }
     .toolbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
     .sky {
@@ -522,6 +605,21 @@
     #talk-typed { margin-top: 10px; }
     .count { margin: 0 2px 4px; color: var(--secondary); }
     .count:empty { display: none; }
+    .words-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin: 0 0 8px;
+      padding: 0 0 8px;
+      background: var(--window);
+    }
+    .words-bar .count { margin: 0; }
+    #export-words { flex-shrink: 0; }
+    #export-words:disabled { opacity: 0.55; }
     #practice[hidden], #practice-empty[hidden] { display: none; }
     #pane-practice #practice {
       background: var(--window);
@@ -724,6 +822,119 @@
       font-size: 13px;
     }
     .checklist-empty:empty { display: none; }
+    #pane-topics { background: var(--grouped); }
+    .topics-shell { max-width: 680px; margin: 0 auto; }
+    .topics-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .topics-head h2 { margin: 0 0 4px; }
+    .topics-head .hint { max-width: 440px; margin: 0; line-height: 1.45; }
+    #topics-generate { flex-shrink: 0; min-height: 32px; }
+    #topics-generate:disabled { opacity: 0.5; }
+    .topics-filters {
+      display: flex;
+      gap: 6px;
+      margin: 14px 0;
+    }
+    .topics-filters button {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--secondary);
+      min-height: 28px;
+      padding: 0 12px;
+    }
+    .topics-filters button[aria-pressed="true"] {
+      background: var(--window);
+      color: var(--label);
+      box-shadow: 0 0 0 1px var(--separator);
+    }
+    .topic-card {
+      background: var(--window);
+      border: 1px solid color-mix(in srgb, var(--separator) 70%, transparent);
+      border-radius: 12px;
+      padding: 16px 16px 14px;
+      margin: 0 0 12px;
+    }
+    .topic-card.is-fresh { box-shadow: 0 0 0 1px var(--blue); }
+    .topic-kicker {
+      margin: 0 0 4px;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--blue-text);
+    }
+    .topic-card h3 {
+      margin: 0 0 6px;
+      font-family: var(--reading);
+      font-size: 22px;
+      font-weight: 560;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .topic-why {
+      margin: 0 0 12px;
+      color: var(--secondary);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .topic-label {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--tertiary);
+    }
+    .topic-words {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+    }
+    .topic-words li {
+      background: var(--grouped);
+      border-radius: 8px;
+      padding: 6px 8px;
+      max-width: 100%;
+    }
+    .topic-words .spelling {
+      display: block;
+      font-family: var(--reading);
+      font-size: 15px;
+    }
+    .topic-words .gloss {
+      display: block;
+      color: var(--secondary);
+      font-size: 11px;
+    }
+    .topic-prompts {
+      margin: 0 0 12px;
+      padding-left: 18px;
+    }
+    .topic-prompts li {
+      margin: 4px 0;
+      font-family: var(--reading);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    .topic-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .topic-empty {
+      margin: 8px 2px 0;
+      color: var(--secondary);
+      font-size: 13px;
+    }
+    @media (max-width: 720px) {
+      .topics-head { flex-direction: column; align-items: stretch; }
+      #topics-generate { align-self: flex-start; }
+    }
     #pane-cards:not([hidden]) {
       display: flex;
       flex-direction: column;
@@ -1243,6 +1454,8 @@
       .sidebar nav { flex-direction: row; flex-wrap: wrap; }
       .tab { width: auto; }
       .search-wrap { width: min(220px, 46vw); }
+      .today-search { padding: 20px 16px 32px; }
+      .today-hit { gap: 10px; }
       #pane-cards { padding: 20px 16px 34px; }
       .cards-home-header { align-items: flex-start; margin-bottom: 28px; }
       .cards-home-title h2 { font-size: 30px; }
@@ -1294,6 +1507,10 @@
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 18.5V6.8A2.8 2.8 0 0 1 8.8 4h8.7a.5.5 0 0 1 .5.5V17" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M6 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M9 8.5h6M9 12h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           <span data-i18n="tabPractice">Practice</span>
         </button>
+        <button class="tab" type="button" data-tab="topics">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.2 16.6 5.6 19a.7.7 0 0 0 .9.9l2.2-1.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 16.8h7.4A3.6 3.6 0 0 0 19 13.2V8.2A3.2 3.2 0 0 0 15.8 5H8.2A3.2 3.2 0 0 0 5 8.2v5.2c0 1.9 1.3 3.4 3 3.4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span data-i18n="tabTopics">Topics</span>
+        </button>
         <button class="tab" type="button" data-tab="cards">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="3.5" width="12" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M5 7.5v11a2 2 0 0 0 2 2h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           <span data-i18n="tabCards">Cards</span>
@@ -1312,7 +1529,7 @@
       <header class="toolbar">
         <h1 id="toolbar-title">Today</h1>
         <div class="toolbar-end">
-          <div class="search-wrap" hidden>
+          <div class="search-wrap">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/>
               <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -1392,6 +1609,11 @@
               <p id="calendar-error" class="error"></p>
             </section>
           </aside>
+          <div id="today-search" class="today-search" hidden>
+            <h2 data-i18n="searchResults">Best matches</h2>
+            <p id="today-search-status" class="hint" aria-live="polite"></p>
+            <ul id="today-search-results" class="today-results"></ul>
+          </div>
         </div>
 
         <div id="pane-practice" class="pane" hidden>
@@ -1434,8 +1656,31 @@
           </section>
         </div>
 
+        <div id="pane-topics" class="pane" hidden>
+          <div class="topics-shell">
+            <div class="topics-head">
+              <div>
+                <h2 data-i18n="tabTopics">Topics</h2>
+                <p class="hint" data-i18n="topicsHint">A situation you and Amer can talk about next lesson, using words you already saved.</p>
+              </div>
+              <button id="topics-generate" class="primary" type="button" data-i18n="topicsGenerate">Generate a topic</button>
+            </div>
+            <p id="topics-error" class="error"></p>
+            <div class="topics-filters" role="group" aria-label="Topic history">
+              <button type="button" data-topics-filter="suggested" aria-pressed="true" data-i18n="topicsSuggested">Suggested</button>
+              <button type="button" data-topics-filter="done" aria-pressed="false" data-i18n="topicsDone">Done</button>
+              <button type="button" data-topics-filter="skipped" aria-pressed="false" data-i18n="topicsSkipped">Skipped</button>
+            </div>
+            <div id="topics-list"></div>
+            <p id="topics-empty" class="topic-empty" hidden></p>
+          </div>
+        </div>
+
         <div id="pane-words" class="pane" hidden>
-          <p id="word-count" class="count"></p>
+          <div class="words-bar">
+            <p id="word-count" class="count"></p>
+            <button id="export-words" class="secondary" type="button" data-i18n="exportWords" data-i18n-aria="exportWordsAria" aria-label="Download every saved word in this language as a CSV file">Export CSV</button>
+          </div>
           <p id="library-error" class="error"></p>
           <div id="library"></div>
         </div>
@@ -1510,6 +1755,17 @@
     let pendingCsvText = "";
     let libraryRequest = 0;
     let searchTimer = null;
+    let topicsCache = [];
+    let topicsFilter = "suggested";
+    let topicsFresh = new Set();
+    let topicsLoadedFor = "";
+    let topicsRequest = 0;
+    let topicsBusy = false;
+    let itemCache = [];
+    let searchSeq = 0;
+    let searchPending = false;
+    let cacheEpoch = 0;
+    let fullListSerial = 0;
 
     function normalizeLearningLanguage(value) {
       const raw = (value || "").toLowerCase();
@@ -1525,6 +1781,7 @@
     const UI = {
       tabToday: "Today",
       tabPractice: "Practice",
+      tabTopics: "Topics",
       tabWords: "Words",
       tabCards: "Cards",
       tabChecklist: "Checklist",
@@ -1594,6 +1851,10 @@
       noLesson: "No upcoming Preply lesson on that calendar.",
       calendarReadError: "Could not read the calendar.",
       wordCount: (n) => (n === 1 ? "1 word" : n + " words"),
+      exportWords: "Export CSV",
+      exportWordsBusy: "Exporting…",
+      exportWordsAria: "Download every saved word in this language as a CSV file",
+      exportFailed: "Could not export words.",
       edit: "Edit",
       save: "Save",
       cancel: "Cancel",
@@ -1611,6 +1872,22 @@
       startScene: "Start. You speak first, in the place, one short line.",
       languageHint:
         "The app stays in English. Pick the language you practice: speaking, listening, and spellings follow that choice.",
+      topicsGenerate: "Generate a topic",
+      topicsAnother: "Another topic",
+      topicsThinking: "Thinking…",
+      topicsSuggested: "Suggested",
+      topicsDone: "Done",
+      topicsSkipped: "Skipped",
+      topicsMarkDone: "Mark done",
+      topicsSkip: "Skip",
+      topicsUndo: "Undo",
+      topicsWords: "Words to use",
+      topicsPrompts: "Starter lines",
+      topicsEmptySuggested: "No topics yet. Generate one from words you already saved.",
+      topicsEmptyDone: "Nothing marked done yet.",
+      topicsEmptySkipped: "Nothing skipped.",
+      topicsNext: "For the next lesson",
+      topicsAlso: "Also possible",
     };
 
     const MODE = {
@@ -1618,6 +1895,7 @@
         lessonHint: "Each Arabizi spelling stays with its English meaning.",
         pastePlaceholder: "eb7as - to search\n6awaret - I developed\n8ararat = decisions",
         colArabizi: "Arabizi",
+        colArabic: "Arabic",
         colGloss: "English",
         typeArabizi: "Or type in Arabizi",
         sentencePlaceholder: "Arabizi that uses this word",
@@ -1625,6 +1903,7 @@
         arabiziAria: "Arabizi",
         speakMissing: "No Arabic script to speak. Type a line, or try again.",
         micLang: "ar-SA",
+        topicsHint: "A situation you and Amer can talk about next lesson, using words you already saved.",
       },
       japanese: {
         lessonHint: "Each kana (or romaji) spelling stays with its English meaning.",
@@ -1639,6 +1918,7 @@
         micLang: "ja-JP",
         importHint:
           "Japanese sheet: Kanji, Kana (hiragana/katakana), and Meaning/English. Practice uses kana; kanji stays on the meaning line.",
+        topicsHint: "A situation for your next lesson, using words you already saved.",
       },
     };
 
@@ -1781,6 +2061,7 @@
       const titleKeys = {
         today: "tabToday",
         practice: "tabPractice",
+        topics: "tabTopics",
         words: "tabWords",
         cards: "tabCards",
         checklist: "tabChecklist",
@@ -1799,10 +2080,24 @@
       if (csvName && !pendingCsvText) csvName.textContent = t("noCsvChosen");
       paintAccount();
       if (changed && reload) {
+        itemCache = [];
+        clearTimeout(searchTimer);
+        searchSeq += 1;
+        cacheEpoch += 1;
+        const query = currentSearchQuery();
+        if (query) {
+          searchPending = true;
+          showSearchResults(query, [], { pending: true });
+        }
         resetTalkForLanguage();
         loadLibrary().catch(() => {});
         loadRecent().catch(() => {});
         renderChecklist();
+        topicsCache = [];
+        topicsFresh = new Set();
+        topicsLoadedFor = "";
+        renderTopics();
+        if (!document.querySelector("#pane-topics").hidden) loadTopics();
         cardsMode = "home";
         if (!document.querySelector("#pane-cards").hidden) loadCardDecks();
       }
@@ -1948,18 +2243,19 @@
       const titleKeys = {
         today: "tabToday",
         practice: "tabPractice",
+        topics: "tabTopics",
         words: "tabWords",
         cards: "tabCards",
         checklist: "tabChecklist",
         settings: "tabSettings",
       };
       document.querySelector("#toolbar-title").textContent = t(titleKeys[name] || "tabToday");
-      document.querySelector(".search-wrap").hidden = name !== "words";
+      document.querySelector(".search-wrap").hidden = name !== "today" && name !== "words";
       if (name !== "cards") {
         clearCardWait();
         stopCardClock();
       }
-      for (const tab of ["today", "practice", "words", "cards", "checklist", "settings"]) {
+      for (const tab of ["today", "practice", "topics", "words", "cards", "checklist", "settings"]) {
         document.querySelector("#pane-" + tab).hidden = tab !== name;
         const button = document.querySelector(`[data-tab="${tab}"]`);
         const active = tab === name;
@@ -1968,7 +2264,149 @@
         else button.removeAttribute("aria-current");
       }
       if (name === "checklist") renderChecklist();
+      if (name === "topics" && topicsLoadedFor !== learningLanguage) loadTopics();
       if (name === "cards" && cardsMode === "home") loadCardDecks();
+    }
+
+    function topicWords(topic) {
+      return Array.isArray(topic.target_words) ? topic.target_words : [];
+    }
+
+    function renderTopicCard(topic) {
+      const card = node("article", "topic-card");
+      if (topicsFresh.has(topic.id)) card.classList.add("is-fresh");
+      const newestPrimary = topicsCache.find(
+        (item) => item.status === "suggested" && item.role === "primary",
+      );
+      let kicker = "";
+      if (topic.status === "suggested" && newestPrimary && topic.id === newestPrimary.id) {
+        kicker = t("topicsNext");
+      } else if (topic.status === "suggested" && topic.role === "alternate") {
+        kicker = t("topicsAlso");
+      }
+      if (kicker) card.append(node("p", "topic-kicker", kicker));
+      card.append(node("h3", "", topic.title || ""));
+      if (topic.why) card.append(node("p", "topic-why", topic.why));
+      const words = topicWords(topic);
+      if (words.length) {
+        card.append(node("p", "topic-label", t("topicsWords")));
+        const list = node("ul", "topic-words");
+        for (const word of words) {
+          const item = document.createElement("li");
+          item.append(node("span", "spelling", word.spelling || ""));
+          item.append(node("span", "gloss", word.gloss || ""));
+          list.append(item);
+        }
+        card.append(list);
+      }
+      const prompts = Array.isArray(topic.prompts) ? topic.prompts.filter(Boolean) : [];
+      if (prompts.length) {
+        card.append(node("p", "topic-label", t("topicsPrompts")));
+        const lines = node("ul", "topic-prompts");
+        for (const line of prompts) lines.append(node("li", "", line));
+        card.append(lines);
+      }
+      const actions = node("div", "topic-actions");
+      if (topic.status === "suggested") {
+        const done = node("button", "primary", t("topicsMarkDone"));
+        done.type = "button";
+        done.onclick = () => updateTopicStatus(topic.id, "done");
+        const skip = node("button", "secondary", t("topicsSkip"));
+        skip.type = "button";
+        skip.onclick = () => updateTopicStatus(topic.id, "skipped");
+        actions.append(done, skip);
+      } else {
+        const undo = node("button", "secondary", t("topicsUndo"));
+        undo.type = "button";
+        undo.onclick = () => updateTopicStatus(topic.id, "suggested");
+        actions.append(undo);
+      }
+      card.append(actions);
+      return card;
+    }
+
+    function renderTopics() {
+      const list = document.querySelector("#topics-list");
+      const empty = document.querySelector("#topics-empty");
+      const button = document.querySelector("#topics-generate");
+      if (!list || !empty || !button) return;
+      document.querySelectorAll("[data-topics-filter]").forEach((filter) => {
+        filter.setAttribute("aria-pressed", filter.dataset.topicsFilter === topicsFilter ? "true" : "false");
+      });
+      const visible = topicsCache.filter((topic) => topic.status === topicsFilter);
+      list.replaceChildren();
+      for (const topic of visible) list.append(renderTopicCard(topic));
+      const emptyKeys = {
+        suggested: "topicsEmptySuggested",
+        done: "topicsEmptyDone",
+        skipped: "topicsEmptySkipped",
+      };
+      empty.hidden = visible.length > 0;
+      empty.textContent = visible.length ? "" : t(emptyKeys[topicsFilter] || "topicsEmptySuggested");
+      if (!topicsBusy) {
+        const hasSuggested = topicsCache.some((topic) => topic.status === "suggested");
+        button.textContent = t(hasSuggested ? "topicsAnother" : "topicsGenerate");
+      }
+    }
+
+    async function loadTopics() {
+      const requestId = ++topicsRequest;
+      const error = document.querySelector("#topics-error");
+      if (error) error.textContent = "";
+      try {
+        const response = await apiFetch(
+          "/api/topics?language=" + encodeURIComponent(learningLanguage),
+        );
+        const payload = await response.json();
+        if (requestId !== topicsRequest) return;
+        if (!response.ok) throw new Error(payload.error || "Could not load topics.");
+        topicsCache = Array.isArray(payload.topics) ? payload.topics : [];
+        topicsLoadedFor = learningLanguage;
+        renderTopics();
+      } catch (err) {
+        if (requestId !== topicsRequest) return;
+        if (error) error.textContent = err.message || "Could not load topics.";
+      }
+    }
+
+    async function updateTopicStatus(id, status) {
+      const error = document.querySelector("#topics-error");
+      if (error) error.textContent = "";
+      try {
+        await post("/api/topics?id=" + encodeURIComponent(id), {
+          status,
+          language: learningLanguage,
+        }, "PUT");
+        await loadTopics();
+      } catch (err) {
+        if (error) error.textContent = err.message || "Could not update that topic.";
+      }
+    }
+
+    async function generateTopic() {
+      const button = document.querySelector("#topics-generate");
+      const error = document.querySelector("#topics-error");
+      if (!button || topicsBusy) return;
+      topicsBusy = true;
+      button.disabled = true;
+      button.textContent = t("topicsThinking");
+      if (error) error.textContent = "";
+      try {
+        const saved = await post("/api/topics", { language: learningLanguage });
+        const ids = [saved.primary, ...(saved.alternates || [])]
+          .filter(Boolean)
+          .map((topic) => topic.id);
+        topicsFresh = new Set(ids);
+        topicsFilter = "suggested";
+        topicsLoadedFor = "";
+        await loadTopics();
+      } catch (err) {
+        if (error) error.textContent = err.message || "Could not make a topic.";
+      } finally {
+        topicsBusy = false;
+        button.disabled = false;
+        renderTopics();
+      }
     }
 
     function checklistStorageKey() {
@@ -2166,11 +2604,14 @@
         const previous = learningLanguage;
         const error = document.querySelector("#language-error");
         error.textContent = "";
-        // Save immediately in the browser, then on the account.
-        applyLanguage(language, { animate: true, reload: true });
+        // Flip the labels now. Load the notebook only after the account has switched,
+        // so the list is not a stale copy of the other language.
+        applyLanguage(language, { animate: true, reload: false });
         try {
           const saved = await post("/api/settings", { language });
           applyLanguage(saved.language || language, { reload: false });
+          await loadLibrary();
+          loadRecent().catch(() => {});
         } catch (err) {
           error.textContent = err.message || "Could not save language.";
           applyLanguage(previous, { reload: true });
@@ -2180,6 +2621,13 @@
 
     document.querySelectorAll(".tab").forEach((button) => {
       button.addEventListener("click", () => showTab(button.dataset.tab));
+    });
+    document.querySelector("#topics-generate").onclick = () => generateTopic();
+    document.querySelectorAll("[data-topics-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        topicsFilter = button.dataset.topicsFilter || "suggested";
+        renderTopics();
+      });
     });
 
     let cardsMode = "home";
@@ -3194,6 +3642,7 @@
         await loadLibrary();
         await loadRecent();
         showTab("words");
+        requestArabicFill((saved.items || []).map((item) => item.id));
       } catch (err) {
         error.className = "error";
         error.textContent = err.message;
@@ -3248,6 +3697,7 @@
         await loadLibrary();
         await loadRecent();
         showTab("words");
+        requestArabicFill(saved.item_ids || []);
       } catch (err) {
         error.className = "error";
         error.textContent = err.message;
@@ -3255,26 +3705,200 @@
       }
     };
 
-    async function loadLibrary() {
-      const requestId = ++libraryRequest;
-      document.querySelector("#library-error").textContent = "";
-      const query = document.querySelector("#search").value.trim();
-      const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
-      let items;
-      try {
-        const response = await apiFetch(url);
-        items = await response.json();
-      } catch (err) {
-        if (requestId !== libraryRequest) return;
-        document.querySelector("#library-error").textContent = err.message || "Search failed.";
+    function currentSearchQuery() {
+      return document.querySelector("#search").value.trim();
+    }
+
+    function foldText(text) {
+      return String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[’‘]/g, "'")
+        .split(/\s+/)
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    function localLexicalMatches(query) {
+      const needle = foldText(query);
+      if (!needle) return [];
+      // Same ranks as lexicon.notebook.search_items, without the embed call.
+      const arabizi = /[2356789]/.test(needle);
+      const scored = [];
+      for (const item of itemCache) {
+        const spelling = foldText(item.spelling);
+        const gloss = foldText(item.gloss);
+        const arabic = foldText(item.arabic_script);
+        let score = 0;
+        let match = "";
+        if (spelling === needle) {
+          score = 1;
+          match = "spelling";
+        } else if (spelling.startsWith(needle)) {
+          score = 0.96;
+          match = "spelling";
+        } else if (spelling.includes(needle)) {
+          score = 0.92;
+          match = "spelling";
+        } else if (arabic && (arabic === needle || arabic.includes(needle))) {
+          score = 0.94;
+          match = "spelling";
+        } else if (!arabizi && gloss === needle) {
+          score = 0.9;
+          match = "meaning";
+        } else if (!arabizi && gloss.includes(needle)) {
+          score = 0.86;
+          match = "meaning";
+        }
+        if (!match) continue;
+        scored.push(Object.assign({}, item, { match, score }));
+      }
+      scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.spelling).localeCompare(String(b.spelling));
+      });
+      return scored.slice(0, 40);
+    }
+
+    function mergeSearchResults(localHits, serverItems) {
+      const server = Array.isArray(serverItems) ? serverItems : [];
+      const seen = new Set();
+      const merged = [];
+      for (const item of server) {
+        if (!item || seen.has(item.id)) continue;
+        seen.add(item.id);
+        merged.push(item);
+      }
+      const extras = [];
+      for (const item of localHits) {
+        if (!item || seen.has(item.id) || item.match !== "spelling") continue;
+        seen.add(item.id);
+        extras.push(item);
+      }
+      extras.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.spelling).localeCompare(String(b.spelling));
+      });
+      return merged.concat(extras);
+    }
+
+    function showSearchResults(query, items, { pending = false } = {}) {
+      renderLibrary(items, query, { pending });
+      renderTodaySearch(query, items, { pending });
+    }
+
+    function renderTodaySearch(query, items, { pending = false } = {}) {
+      const pane = document.querySelector("#pane-today");
+      const panel = document.querySelector("#today-search");
+      const list = document.querySelector("#today-search-results");
+      const status = document.querySelector("#today-search-status");
+      if (!query) {
+        pane.classList.remove("is-searching");
+        panel.hidden = true;
+        list.replaceChildren();
+        status.textContent = "";
         return;
       }
-      if (requestId !== libraryRequest) return;
+      pane.classList.add("is-searching");
+      panel.hidden = false;
+      list.replaceChildren();
+      const rows = Array.isArray(items) ? items : [];
+      if (!rows.length) {
+        status.textContent = pending ? "Searching…" : "No words match that search.";
+        return;
+      }
+      status.textContent = "";
+      for (const item of rows) {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "today-hit";
+        const spelling = document.createElement("span");
+        spelling.className = "arabizi";
+        spelling.textContent = item.spelling;
+        const gloss = document.createElement("span");
+        gloss.className = "today-hit-gloss";
+        gloss.textContent = item.gloss;
+        button.append(spelling);
+        const arabic = arabicSpan(item);
+        if (arabic) button.append(arabic);
+        button.append(gloss);
+        button.addEventListener("click", () => openPractice(item));
+        li.append(button);
+        list.append(li);
+      }
+    }
+
+    document.querySelector("#export-words").onclick = () => {
+      exportWords().catch((err) => {
+        document.querySelector("#library-error").textContent =
+          err.message || t("exportFailed");
+      });
+    };
+
+    async function exportWords() {
+      const button = document.querySelector("#export-words");
+      const error = document.querySelector("#library-error");
+      error.textContent = "";
+      button.disabled = true;
+      button.textContent = t("exportWordsBusy");
+      try {
+        const response = await apiFetch("/api/items?format=csv");
+        if (!response.ok) {
+          let message = t("exportFailed");
+          try {
+            const payload = await response.json();
+            if (payload && payload.error) message = payload.error;
+          } catch (err) {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const named = /filename="([^"]+)"/.exec(
+          response.headers.get("Content-Disposition") || "",
+        );
+        const filename = named ? named[1] : fallbackCsvName();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      } finally {
+        button.disabled = false;
+        button.textContent = t("exportWords");
+      }
+    }
+
+    function fallbackCsvName() {
+      const now = new Date();
+      return (
+        "sawt-words-" +
+        [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+        ].join("-") +
+        ".csv"
+      );
+    }
+
+    function renderLibrary(items, query, { pending = false } = {}) {
       const library = document.querySelector("#library");
       const count = document.querySelector("#word-count");
       library.replaceChildren();
-      if (!Array.isArray(items) || items.length === 0) {
+      const rows = Array.isArray(items) ? items : [];
+      if (rows.length === 0) {
         count.textContent = "";
+        if (query && pending) {
+          const pendingNote = document.createElement("p");
+          pendingNote.className = "empty";
+          pendingNote.textContent = "Searching…";
+          library.append(pendingNote);
+          return;
+        }
         const empty = document.createElement("p");
         empty.className = "empty";
         empty.textContent = query ? "No words match that search." : t("emptyLibrary");
@@ -3287,41 +3911,197 @@
         }
         return;
       }
-      count.textContent = t("wordCount")(items.length);
+      count.textContent = t("wordCount")(rows.length);
       if (query) {
         // Search stays in relevance order — do not regroup by lesson date.
         const heading = document.createElement("h3");
         heading.textContent = t("searchResults");
         library.append(heading);
-        const table = document.createElement("table");
-        const body = document.createElement("tbody");
-        for (const item of items) body.append(wordRow(item));
-        table.append(body);
-        library.append(table);
+        library.append(wordsTable(rows));
         return;
       }
       const groups = new Map();
-      for (const item of items) {
+      for (const item of rows) {
         if (!groups.has(item.learned_on)) groups.set(item.learned_on, []);
         groups.get(item.learned_on).push(item);
       }
-      for (const [date, rows] of groups) {
+      for (const [date, grouped] of groups) {
         const heading = document.createElement("h3");
         heading.textContent = formatDay(date);
         library.append(heading);
-        const table = document.createElement("table");
-        const body = document.createElement("tbody");
-        for (const item of rows) body.append(wordRow(item));
-        table.append(body);
-        library.append(table);
+        library.append(wordsTable(grouped));
       }
     }
 
+    function wordsTable(items) {
+      const table = document.createElement("table");
+      if (learningLanguage === "arabic") {
+        const head = document.createElement("thead");
+        const labels = document.createElement("tr");
+        for (const label of [t("colArabizi"), t("colArabic"), t("colGloss"), "", ""]) {
+          const th = document.createElement("th");
+          th.textContent = label;
+          if (label === t("colArabic")) {
+            th.className = "arabic-col";
+            th.title = "Levantine spelling. Dictionary matches come from English Wiktionary (CC BY-SA).";
+          }
+          labels.append(th);
+        }
+        head.append(labels);
+        table.append(head);
+      }
+      const body = document.createElement("tbody");
+      for (const item of items) body.append(wordRow(item));
+      table.append(body);
+      return table;
+    }
+
+    function isUnrankedNotebook(items) {
+      return items.length > 0 && items.every((item) => !item || !("match" in item));
+    }
+
+    async function loadLibrary() {
+      const requestId = ++libraryRequest;
+      const seq = searchSeq;
+      const epoch = cacheEpoch;
+      const query = currentSearchQuery();
+      const ownsFullList = !query;
+      const listSerial = ownsFullList ? ++fullListSerial : fullListSerial;
+      document.querySelector("#library-error").textContent = "";
+      const url = query ? "/api/items?q=" + encodeURIComponent(query) : "/api/items";
+      let items;
+      try {
+        const response = await apiFetch(url);
+        items = await response.json();
+      } catch (err) {
+        if (requestId !== libraryRequest || seq !== searchSeq) return;
+        document.querySelector("#library-error").textContent = err.message || "Search failed.";
+        searchPending = false;
+        if (query) showSearchResults(query, localLexicalMatches(query), { pending: false });
+        return;
+      }
+      if (!Array.isArray(items)) items = [];
+      if (epoch !== cacheEpoch) return;
+      // Queries shorter than two characters come back as the whole notebook
+      // (no match tags). Keep that list as the cache; do not paint it as search hits.
+      const unranked = isUnrankedNotebook(items);
+      // A newer full-list fetch wins. If nothing has landed yet, keep this
+      // snapshot so the first keystrokes can match locally.
+      if ((ownsFullList || unranked) && (listSerial === fullListSerial || itemCache.length === 0)) {
+        itemCache = items;
+      }
+      const stale = requestId !== libraryRequest || seq !== searchSeq;
+      if (stale) {
+        const live = currentSearchQuery();
+        if (live && searchPending) {
+          showSearchResults(live, localLexicalMatches(live), { pending: true });
+        }
+        return;
+      }
+      searchPending = false;
+      if (!query) {
+        showSearchResults("", items, { pending: false });
+        return;
+      }
+      const display = unranked
+        ? localLexicalMatches(query)
+        : mergeSearchResults(localLexicalMatches(query), items);
+      showSearchResults(query, display, { pending: false });
+    }
+
     function scheduleLibrarySearch() {
+      const query = currentSearchQuery();
+      searchSeq += 1;
       clearTimeout(searchTimer);
+      document.querySelector("#library-error").textContent = "";
+      if (!query) {
+        searchPending = false;
+        renderTodaySearch("", []);
+        if (itemCache.length) renderLibrary(itemCache, "");
+        loadLibrary().catch(() => {});
+        return;
+      }
+      searchPending = true;
+      showSearchResults(query, localLexicalMatches(query), { pending: true });
       searchTimer = setTimeout(() => {
         loadLibrary().catch(() => {});
       }, 280);
+    }
+
+    function runLibrarySearchNow() {
+      searchSeq += 1;
+      clearTimeout(searchTimer);
+      const query = currentSearchQuery();
+      document.querySelector("#library-error").textContent = "";
+      if (!query) {
+        searchPending = false;
+        renderTodaySearch("", []);
+        if (itemCache.length) renderLibrary(itemCache, "");
+      } else {
+        searchPending = true;
+        showSearchResults(query, localLexicalMatches(query), { pending: true });
+      }
+      loadLibrary().catch(() => {});
+    }
+
+    function arabicSourceTitle(source) {
+      if (source === "user") return "Arabic spelling you edited";
+      if (source === "dictionary") return "Arabic spelling from English Wiktionary";
+      if (source === "ai") return "Arabic spelling suggested from the Arabizi";
+      return "Arabic spelling";
+    }
+
+    function arabicSpan(item) {
+      if (learningLanguage !== "arabic" || !item || !item.arabic_script) return null;
+      const script = document.createElement("span");
+      script.className = "arabic-script";
+      script.dir = "rtl";
+      script.lang = "ar";
+      script.textContent = item.arabic_script;
+      script.title = arabicSourceTitle(item.arabic_source);
+      return script;
+    }
+
+    function arabicCell(item) {
+      const cell = document.createElement("td");
+      cell.className = "arabic-script arabic-col";
+      cell.dir = "rtl";
+      cell.lang = "ar";
+      cell.textContent = (item && item.arabic_script) || "";
+      cell.title = arabicSourceTitle(item && item.arabic_source);
+      return cell;
+    }
+
+    function paintPracticeTitle(item) {
+      const title = document.querySelector("#practice-title");
+      title.replaceChildren();
+      title.append(document.createTextNode(item.spelling || ""));
+      const script = arabicSpan(item);
+      if (script) title.append(script);
+    }
+
+    let arabicFillToken = 0;
+
+    async function requestArabicFill(ids) {
+      if (learningLanguage !== "arabic" || !Array.isArray(ids) || !ids.length) return;
+      const token = ++arabicFillToken;
+      let pending = ids.filter((id) => id != null);
+      for (let round = 0; round < 8 && pending.length && token === arabicFillToken; round += 1) {
+        let result;
+        try {
+          result = await post("/api/items", { action: "fill-arabic", ids: pending });
+        } catch (err) {
+          return;
+        }
+        if (token !== arabicFillToken) return;
+        if (result.filled) {
+          await loadLibrary();
+          await loadRecent();
+        }
+        const next = Array.isArray(result.remaining_ids) ? result.remaining_ids : [];
+        if (!result.filled || next.length >= pending.length) return;
+        pending = next;
+      }
     }
 
     function wordRow(item) {
@@ -3346,7 +4126,8 @@
       edit.textContent = t("edit");
       edit.onclick = () => beginEdit(row, item);
       editCell.append(edit);
-      row.append(cell, gloss, kind, editCell);
+      if (learningLanguage === "arabic") row.append(cell, arabicCell(item), gloss, kind, editCell);
+      else row.append(cell, gloss, kind, editCell);
       return row;
     }
 
@@ -3361,8 +4142,17 @@
       gloss.type = "text";
       gloss.value = item.gloss;
       gloss.setAttribute("aria-label", t("glossAria"));
+      const arabic = document.createElement("input");
+      arabic.type = "text";
+      arabic.className = "arabic-script";
+      arabic.dir = "rtl";
+      arabic.lang = "ar";
+      arabic.value = item.arabic_script || "";
+      arabic.setAttribute("aria-label", "Arabic");
       const spellingCell = document.createElement("td");
       spellingCell.append(spelling);
+      const arabicEditCell = document.createElement("td");
+      arabicEditCell.append(arabic);
       const glossCell = document.createElement("td");
       glossCell.colSpan = 2;
       glossCell.append(gloss);
@@ -3376,30 +4166,35 @@
       cancel.className = "text";
       cancel.type = "button";
       cancel.textContent = t("cancel");
-      save.onclick = () => saveEdit(item, spelling.value, gloss.value);
+      const commit = () => saveEdit(item, spelling.value, gloss.value, learningLanguage === "arabic" ? arabic.value : undefined);
+      save.onclick = commit;
       cancel.onclick = () => loadLibrary();
       const onKey = (event) => {
-        if (event.key === "Enter") saveEdit(item, spelling.value, gloss.value);
+        if (event.key === "Enter") commit();
         if (event.key === "Escape") loadLibrary();
       };
       spelling.onkeydown = onKey;
       gloss.onkeydown = onKey;
+      arabic.onkeydown = onKey;
       actions.append(save, cancel);
-      row.replaceChildren(spellingCell, glossCell, actions);
+      if (learningLanguage === "arabic") row.replaceChildren(spellingCell, arabicEditCell, glossCell, actions);
+      else row.replaceChildren(spellingCell, glossCell, actions);
       spelling.focus();
     }
 
-    async function saveEdit(item, spelling, gloss) {
+    async function saveEdit(item, spelling, gloss, arabic) {
       const libraryError = document.querySelector("#library-error");
       libraryError.textContent = "";
+      const body = { spelling, gloss };
+      if (arabic !== undefined) body.arabic_script = arabic;
       try {
         const saved = await post(
           "/api/items/" + item.id,
-          { spelling, gloss },
+          body,
           "PUT",
         );
         if (currentId === item.id) {
-          document.querySelector("#practice-title").textContent = saved.spelling;
+          paintPracticeTitle(saved);
           document.querySelector("#practice-gloss").textContent = saved.gloss;
         }
         await loadLibrary();
@@ -3410,7 +4205,17 @@
     }
 
     async function loadRecent() {
+      const epoch = cacheEpoch;
+      const listSerial = ++fullListSerial;
       const items = await (await apiFetch("/api/items")).json();
+      if (epoch !== cacheEpoch || listSerial !== fullListSerial) return;
+      if (Array.isArray(items)) {
+        itemCache = items;
+        const query = currentSearchQuery();
+        if (query && searchPending) {
+          showSearchResults(query, localLexicalMatches(query), { pending: true });
+        }
+      }
       const recent = document.querySelector("#recent");
       const lessonIds = [];
       for (const item of items) {
@@ -3453,7 +4258,8 @@
           const kind = document.createElement("td");
           kind.className = "kind";
           kind.textContent = item.kind;
-          row.append(spelling, gloss, kind);
+          if (learningLanguage === "arabic") row.append(spelling, arabicCell(item), gloss, kind);
+          else row.append(spelling, gloss, kind);
           body.append(row);
         }
         table.append(body);
@@ -3466,7 +4272,7 @@
       document.querySelector("#practice-empty").hidden = true;
       const panel = document.querySelector("#practice");
       panel.hidden = false;
-      document.querySelector("#practice-title").textContent = item.spelling;
+      paintPracticeTitle(item);
       document.querySelector("#practice-gloss").textContent = item.gloss;
       document.querySelector("#sentence").value = "";
       const judgment = document.querySelector("#judgment");
@@ -4036,12 +4842,12 @@
       if (event.key !== "Enter") return;
       // type=search otherwise submits/refires and the list flickers.
       event.preventDefault();
-      clearTimeout(searchTimer);
-      loadLibrary().catch(() => {});
+      runLibrarySearchNow();
     });
     searchField.addEventListener("search", () => {
-      clearTimeout(searchTimer);
-      loadLibrary().catch(() => {});
+      // Clear button. Enter is already handled on keydown.
+      if (currentSearchQuery()) return;
+      runLibrarySearchNow();
     });
     bootAuth().then(() => {
       if (clerk && !clerk.user) return;

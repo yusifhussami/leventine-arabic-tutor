@@ -27,6 +27,7 @@ REQUIRED_COLUMNS = {
 _WORD_HEADERS = frozenset(
     {"word", "arabizi", "romaji", "spelling", "latin", "expression", "term", "vocab"}
 )
+_ARABIC_HEADERS = frozenset({"arabic", "arabic script", "arabic spelling"})
 _KANA_HEADERS = frozenset(
     {
         "kana",
@@ -124,6 +125,8 @@ CREATE TABLE IF NOT EXISTS lesson_items (
     spelling TEXT NOT NULL,
     gloss TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('word', 'phrase')),
+    arabic_script TEXT NOT NULL DEFAULT '',
+    arabic_source TEXT NOT NULL DEFAULT '',
     UNIQUE (lesson_id, position)
 );
 
@@ -193,6 +196,30 @@ CREATE TABLE IF NOT EXISTS study_cards (
 );
 
 CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards (deck_id, suspended, due_at);
+
+-- Lesson conversation topics generated from saved words.
+-- payload is the model JSON; target_words cites lesson_items ids and spellings.
+CREATE TABLE IF NOT EXISTS lesson_topics (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'arabic',
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('suggested', 'done', 'skipped')),
+    target_words TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_lesson_topics_user_lang
+    ON lesson_topics (user_id, language, created_at DESC, id ASC);
+
+-- Wiktionary page text and successful Arabizi→Arabic resolutions.
+-- A second backfill reads this instead of calling the network again.
+CREATE TABLE IF NOT EXISTS script_cache (
+    cache_key TEXT PRIMARY KEY,
+    payload TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
 """
 
 
@@ -239,6 +266,25 @@ def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
             "CREATE INDEX IF NOT EXISTS idx_lessons_user_lang "
             "ON lessons (user_id, language, learned_on DESC, id DESC)"
         )
+    if "lesson_items" in tables:
+        item_cols = {row[1] for row in conn.execute("PRAGMA table_info(lesson_items)")}
+        if "arabic_script" not in item_cols:
+            conn.execute(
+                "ALTER TABLE lesson_items ADD COLUMN arabic_script TEXT NOT NULL DEFAULT ''"
+            )
+        if "arabic_source" not in item_cols:
+            conn.execute(
+                "ALTER TABLE lesson_items ADD COLUMN arabic_source TEXT NOT NULL DEFAULT ''"
+            )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS script_cache (
+            cache_key TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            fetched_at TEXT NOT NULL
+        );
+        """
+    )
     if "settings" in tables:
         setting_cols = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
         if setting_cols and "user_id" not in setting_cols:
@@ -256,6 +302,23 @@ def migrate_notebook_schema(conn: sqlite3.Connection) -> None:
                 ALTER TABLE settings_v2 RENAME TO settings;
                 """
             )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lesson_topics (
+            id INTEGER PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            language TEXT NOT NULL DEFAULT 'arabic',
+            title TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('suggested', 'done', 'skipped')),
+            target_words TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_lesson_topics_user_lang
+            ON lesson_topics (user_id, language, created_at DESC, id ASC);
+        """
+    )
     conn.commit()
 
 
@@ -280,6 +343,8 @@ def _header_map(fieldnames: list[str] | None) -> dict[str, str]:
             found["kana"] = name
         elif key in _KANJI_HEADERS and "kanji" not in found:
             found["kanji"] = name
+        elif key in _ARABIC_HEADERS and "arabic" not in found:
+            found["arabic"] = name
         elif key in _WORD_HEADERS and "word" not in found:
             found["word"] = name
         elif key in _MEANING_HEADERS and "meaning" not in found:
@@ -363,6 +428,9 @@ def parse_vocabulary_csv(text: str) -> list[dict]:
                 else "",
                 "status": (row.get(columns["status"]) or "").strip()
                 if "status" in columns
+                else "",
+                "arabic": (row.get(columns["arabic"]) or "").strip()
+                if "arabic" in columns
                 else "",
             }
         )
