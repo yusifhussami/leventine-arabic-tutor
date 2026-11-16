@@ -111,8 +111,8 @@ export function importCsv(
   return api.post("/api/import-csv", { csv, learned_on: learnedOn, language });
 }
 
-export function updateItem(api: Api, id: number, spelling: string, gloss: string): Promise<NotebookItem> {
-  return api.post(`/api/items/${id}`, { spelling, gloss }, "PUT");
+export function updateItem(api: Api, id: number, spelling: string, gloss: string, arabic?: string): Promise<NotebookItem> {
+  return api.post(`/api/items/${id}`, { spelling, gloss, ...(arabic === undefined ? {} : { arabic_script: arabic }) }, "PUT");
 }
 
 export function similarItems(api: Api, id: number): Promise<{ spelling: string; gloss: string }[]> {

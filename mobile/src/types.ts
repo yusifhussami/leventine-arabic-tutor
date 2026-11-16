@@ -8,6 +8,8 @@ export type NotebookItem = {
   learned_on: string;
   lesson_id: number;
   language?: string;
+  arabic_script?: string;
+  arabic_source?: string;
 };
 
 export type PreviewItem = {

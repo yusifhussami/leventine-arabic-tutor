@@ -3,6 +3,7 @@
   "functions": {
     "api/**/*.py": {
       "excludeFiles": "{tests/**,docs/**,data/**,web/**,mobile/**,.agents/**,**/*.md}",
+      "includeFiles": "lexicon/arwords_index.json",
       "maxDuration": 60
     }
   },

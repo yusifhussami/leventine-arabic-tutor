@@ -196,6 +196,14 @@ class NotebookHandler(BaseHTTPRequestHandler):
                     ],
                 )
                 return
+            if path == "/api/items" and body.get("action") == "match-arwords":
+                from lexicon.arwords import match_notebook
+                conn = _db()
+                try:
+                    self._json(200, match_notebook(conn, LOCAL_USER))
+                finally:
+                    conn.close()
+                return
             if path == "/api/items" and (body.get("action") or "").strip() == "fill-arabic":
                 conn = _db()
                 try:
